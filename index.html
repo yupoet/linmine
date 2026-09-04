@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#1b1410" />
+    <meta name="description" content="Lin Mine — tap, dig and chain your way to the bottom of the shaft." />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <title>Lin Mine</title>
+    <style>
+      /* Boot-critical styles live here so the first paint is correct before
+         any module has loaded. Everything else comes from src/ui/styles.css. */
+      :root {
+        color-scheme: dark;
+        --soil-900: #1b1410;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        background: var(--soil-900);
+        color: #f6ece0;
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        /* The game is a single-finger tap game: suppress browser gestures. */
+        touch-action: none;
+        overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-text-size-adjust: 100%;
+      }
+      #app {
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+      }
+      #stage {
+        position: absolute;
+        inset: 0;
+        display: block;
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+      }
+      #ui {
+        position: absolute;
+        inset: 0;
+        /* The UI is a pass-through layer; individual controls opt back in. */
+        pointer-events: none;
+      }
+      #boot {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        gap: 0.75rem;
+        text-align: center;
+        background: radial-gradient(circle at 50% 18%, #3a2a1d 0%, var(--soil-900) 70%);
+        z-index: 10;
+        transition: opacity 220ms ease;
+      }
+      #boot.is-hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #boot h1 {
+        margin: 0;
+        font-size: clamp(2rem, 9vw, 3.5rem);
+        letter-spacing: 0.06em;
+        color: #ffcc66;
+        text-shadow: 0 3px 0 #6b4310;
+      }
+      #boot p {
+        margin: 0;
+        opacity: 0.7;
+        font-size: 0.95rem;
+      }
+      #fatal {
+        position: absolute;
+        inset: 0;
+        display: none;
+        place-content: center;
+        padding: 2rem;
+        text-align: center;
+        background: var(--soil-900);
+        z-index: 20;
+        font-size: 0.95rem;
+        line-height: 1.6;
+      }
+      #fatal code {
+        display: block;
+        margin-top: 1rem;
+        opacity: 0.6;
+        font-size: 0.8rem;
+        word-break: break-word;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="stage"></canvas>
+      <div id="ui"></div>
+      <div id="boot">
+        <h1>Lin Mine</h1>
+        <p>Digging the shaft…</p>
+      </div>
+      <div id="fatal">
+        <div>
+          <strong>Lin Mine could not start.</strong>
+          <code id="fatal-detail"></code>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
