@@ -117,3 +117,15 @@ try {
   // eslint-disable-next-line no-console
   console.error(error);
 }
+
+// Register the service worker so the game is playable offline after the
+// first visit. The SW only owns the static app shell; runtime state
+// (save/profile) lives in localStorage so it survives cache evictions.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch((err) => {
+      // eslint-disable-next-line no-console
+      console.warn('service worker registration failed', err);
+    });
+  });
+}
