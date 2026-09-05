@@ -21,6 +21,7 @@ import type {
   UIHandlers,
 } from '../app/contracts.ts';
 import { h, setFlag, setText, text } from './dom.ts';
+import { DEFAULT_THEME, isThemeId, type ThemeId } from '../config/theme.ts';
 import { t } from '../i18n/index.ts';
 import { createDraft } from './draft.ts';
 import { createHud } from './hud.ts';
@@ -35,6 +36,15 @@ const TOAST_EXIT_MS = 260;
 const MAX_TOASTS = 3;
 const TUTORIAL_ANCHORS = ['grid', 'hud', 'draft', 'result'] as const;
 
+/** Browser chrome colour per skin; mirrors index.html's boot variables. */
+const THEME_COLORS: Record<ThemeId, string> = { candy: '#f7ecd2', ember: '#1b1410' };
+
+/** The boot script in index.html already stamped <html>; inherit from it. */
+function readBootTheme(): ThemeId {
+  const stamped = document.documentElement.dataset.theme;
+  return isThemeId(stamped) ? stamped : DEFAULT_THEME;
+}
+
 export function createUI(root: HTMLElement, handlers: UIHandlers): UIAPI {
   const media = window.matchMedia('(prefers-reduced-motion: reduce)');
   let calmSetting = false;
@@ -42,6 +52,18 @@ export function createUI(root: HTMLElement, handlers: UIHandlers): UIAPI {
 
   const layer = h('div', 'ui');
   root.appendChild(layer);
+
+  /** Owns every DOM write tied to the skin, including the browser chrome. */
+  function applyTheme(theme: ThemeId): void {
+    document.documentElement.dataset.theme = theme;
+    layer.dataset.theme = theme;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta instanceof HTMLMetaElement) meta.content = THEME_COLORS[theme];
+  }
+
+  // A language switch rebuilds the whole UI, so pick the theme back up from
+  // the document instead of waiting for the app to push it again.
+  applyTheme(readBootTheme());
 
   const hud = createHud(handlers, motionOff);
   const title = createTitle(handlers);
@@ -172,6 +194,10 @@ export function createUI(root: HTMLElement, handlers: UIHandlers): UIAPI {
 
     hint(message: string): void {
       hud.hint(message);
+    },
+
+    setTheme(theme: ThemeId): void {
+      applyTheme(theme);
     },
 
     dispose(): void {

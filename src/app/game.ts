@@ -28,6 +28,7 @@ import {
 } from '../config/economy.ts';
 import { CARDS, cardById, MAX_CARDS_PER_RUN } from '../config/cards.ts';
 import { LEVELS, levelById, dailyLevel, isDailyId } from '../config/levels.ts';
+import type { ThemeId } from '../config/theme.ts';
 import { CONFIG_VERSION } from '../config/version.ts';
 import { BlockKind } from '../config/blocks.ts';
 import type {
@@ -296,6 +297,7 @@ export function createGame(deps: GameDeps): GameAPI {
       reducedMotion: profile.settings.reducedMotion,
       haptics: profile.settings.haptics,
       lang: profile.settings.lang,
+      theme: profile.settings.theme,
       schemaVersion: profile.schemaVersion,
       configVersion: CONFIG_VERSION,
     };
@@ -682,6 +684,13 @@ export function createGame(deps: GameDeps): GameAPI {
       save();
       goToSettings();
     },
+    setTheme(theme: ThemeId): void {
+      profile.settings.theme = theme;
+      renderer.setTheme(theme);
+      ui.setTheme(theme);
+      save();
+      goToSettings();
+    },
     setHaptics(value: boolean): void {
       profile.settings.haptics = value;
       save();
@@ -706,6 +715,8 @@ export function createGame(deps: GameDeps): GameAPI {
       save();
       audio.setMuted(profile.settings.muted);
       renderer.setReducedMotion(profile.settings.reducedMotion);
+      renderer.setTheme(profile.settings.theme);
+      ui.setTheme(profile.settings.theme);
       ui.toast(t('Save reset'));
       goTo('title');
     },
@@ -805,6 +816,8 @@ export function createGame(deps: GameDeps): GameAPI {
 
     audio.setMuted(profile.settings.muted);
     renderer.setReducedMotion(profile.settings.reducedMotion);
+    renderer.setTheme(profile.settings.theme);
+    ui.setTheme(profile.settings.theme);
     setI18nLang(profile.settings.lang);
     if (typeof document !== 'undefined') document.title = gameName();
     goTo('title');

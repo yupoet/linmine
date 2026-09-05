@@ -11,6 +11,7 @@ import {
 } from '../../src/core/save.ts';
 import { SAVE_SCHEMA_VERSION } from '../../src/config/version.ts';
 import { PICKAXE_MAX_LEVEL } from '../../src/config/economy.ts';
+import { DEFAULT_THEME } from '../../src/config/theme.ts';
 
 describe('save profile', () => {
   it('creates a fresh profile with every level tracked', () => {
@@ -116,5 +117,44 @@ describe('save profile', () => {
     expect(profile.pickaxeLevel).toBe(1);
     expect(profile.cards).toEqual({});
     expect(profile.stats.runs).toBe(0);
+  });
+});
+
+describe('save theme migration', () => {
+  it('gives a fresh profile the default theme', () => {
+    expect(createProfile().settings.theme).toBe(DEFAULT_THEME);
+  });
+
+  it('falls back to the default theme when the stored id is garbage', () => {
+    for (const theme of ['neon', 42, null, undefined, {}]) {
+      expect(sanitizeProfile({ settings: { theme } }).settings.theme).toBe(DEFAULT_THEME);
+    }
+  });
+
+  it('keeps a valid stored theme', () => {
+    expect(sanitizeProfile({ settings: { theme: 'ember' } }).settings.theme).toBe('ember');
+  });
+
+  it('migrates a v1 save by filling in the theme', () => {
+    const migrated = migrateProfile({ schemaVersion: 1, cash: 10 });
+    expect(migrated.schemaVersion).toBe(2);
+    expect(migrated.settings.theme).toBe(DEFAULT_THEME);
+    expect(migrated.cash).toBe(10);
+  });
+
+  it('is idempotent: migrating twice changes nothing', () => {
+    const once = migrateProfile({ schemaVersion: 1, cash: 10 });
+    once.settings.theme = 'ember';
+    const twice = migrateProfile(JSON.parse(serializeProfile(once)));
+    expect(twice.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+    expect(twice.settings.theme).toBe('ember');
+    expect(twice.cash).toBe(10);
+  });
+
+  it('round-trips a chosen theme through serialization', () => {
+    const profile = createProfile();
+    profile.settings.theme = 'ember';
+    const restored = migrateProfile(JSON.parse(serializeProfile(profile)));
+    expect(restored.settings.theme).toBe('ember');
   });
 });

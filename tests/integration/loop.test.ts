@@ -21,11 +21,12 @@ import type {
   UIHandlers,
 } from '../../src/app/contracts.ts';
 import { createAudio } from '../../src/platform/audio.ts';
-import { createStorage } from '../../src/platform/storage.ts';
+import { createStorage, THEME_MIRROR_KEY, type KeyValueStore } from '../../src/platform/storage.ts';
 import { PICKAXE_MAX_LEVEL } from '../../src/config/economy.ts';
 import { LEVELS } from '../../src/config/levels.ts';
 import { getLegalTargets } from '../../src/core/run.ts';
 import { BlockKind } from '../../src/config/blocks.ts';
+import { DEFAULT_THEME, type ThemeId } from '../../src/config/theme.ts';
 import type { Cell, DigResult, RunState } from '../../src/core/types.ts';
 import type { TargetInfo } from '../../src/core/run.ts';
 
@@ -41,11 +42,45 @@ interface Recorder {
   hints: string[];
   tutorials: string[];
   playDigCalls: number;
+  /** Themes pushed into the UI stub, oldest first. */
+  uiThemes: ThemeId[];
 }
 
-function createStubRenderer(): RendererAPI & { picked: Cell | null } {
+function createRecorder(): Recorder {
+  return {
+    screens: [],
+    hud: null,
+    draft: null,
+    result: null,
+    shop: null,
+    settings: null,
+    levels: [],
+    toasts: [],
+    hints: [],
+    tutorials: [],
+    playDigCalls: 0,
+    uiThemes: [],
+  };
+}
+
+/** Observable store so tests can assert on what actually hit persistence. */
+function createTestStore(): KeyValueStore {
+  const map = new Map<string, string>();
+  return {
+    getItem: (key) => map.get(key) ?? null,
+    setItem: (key, value) => void map.set(key, value),
+    removeItem: (key) => void map.delete(key),
+  };
+}
+
+function createStubRenderer(): RendererAPI & { picked: Cell | null; themes: ThemeId[] } {
+  const themes: ThemeId[] = [];
   return {
     picked: null,
+    themes,
+    setTheme(theme) {
+      themes.push(theme);
+    },
     setState() {},
     playDig() {
       void 0;
@@ -97,29 +132,21 @@ function createStubUi(recorder: Recorder): UIAPI {
     hint(message) {
       recorder.hints.push(message);
     },
+    setTheme(theme) {
+      recorder.uiThemes.push(theme);
+    },
     dispose() {},
   };
 }
 
-function setup(options: { seed?: number } = {}) {
-  const recorder: Recorder = {
-    screens: [],
-    hud: null,
-    draft: null,
-    result: null,
-    shop: null,
-    settings: null,
-    levels: [],
-    toasts: [],
-    hints: [],
-    tutorials: [],
-    playDigCalls: 0,
-  };
+function setup(options: { seed?: number; store?: KeyValueStore } = {}) {
+  const recorder = createRecorder();
 
   const renderer = createStubRenderer();
   const analytics = createAnalytics();
   const audio = createAudio();
-  const storage = createStorage();
+  const store = options.store ?? createTestStore();
+  const storage = createStorage(store);
 
   const ui = createStubUi(recorder);
   const game = createGame({
@@ -133,7 +160,7 @@ function setup(options: { seed?: number } = {}) {
   });
 
   game.boot();
-  return { game, recorder, renderer, analytics, storage, ui: game.handlers };
+  return { game, recorder, renderer, analytics, storage, store, ui: game.handlers };
 }
 
 describe('app loop', () => {
@@ -295,19 +322,7 @@ describe('app loop', () => {
 
     // A second game reading the same store must see the saved profile.
     const analytics = createAnalytics();
-    const recorder: Recorder = {
-      screens: [],
-      hud: null,
-      draft: null,
-      result: null,
-      shop: null,
-      settings: null,
-      levels: [],
-      toasts: [],
-      hints: [],
-      tutorials: [],
-      playDigCalls: 0,
-    };
+    const recorder = createRecorder();
     const reloaded = createGame({
       ui: createStubUi(recorder),
       renderer: createStubRenderer(),
@@ -383,6 +398,36 @@ describe('app loop', () => {
     renderer.pickCell = () => ({ col: 0, row: 40 }); // far below, unreachable
     game.tapAt(5, 5);
     expect(recorder.hints.length).toBeGreaterThan(0);
+  });
+
+  it('boots on the default skin and reports it in the settings view', () => {
+    const { ui, recorder, renderer } = setup();
+    ui.goToSettings();
+    expect(recorder.settings?.theme).toBe(DEFAULT_THEME);
+    expect(renderer.themes).toContain(DEFAULT_THEME);
+    expect(recorder.uiThemes).toContain(DEFAULT_THEME);
+  });
+
+  it('switches the skin into both layers and persists it', () => {
+    const { game, ui, recorder, renderer, store } = setup();
+    ui.goToSettings();
+    ui.setTheme('ember');
+
+    expect(game.getProfile().settings.theme).toBe('ember');
+    expect(renderer.themes.at(-1)).toBe('ember');
+    expect(recorder.uiThemes.at(-1)).toBe('ember');
+    expect(recorder.settings?.theme).toBe('ember');
+    expect(store.getItem(THEME_MIRROR_KEY)).toBe('ember');
+  });
+
+  it('boots the saved skin after a reload', () => {
+    const first = setup();
+    first.ui.setTheme('ember');
+
+    const second = setup({ store: first.store });
+    expect(second.game.getProfile().settings.theme).toBe('ember');
+    expect(second.renderer.themes).toContain('ember');
+    expect(second.recorder.uiThemes).toContain('ember');
   });
 
   it('never exceeds the pickaxe ceiling', () => {

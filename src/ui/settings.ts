@@ -13,6 +13,7 @@ import {
   setText,
   text,
 } from './dom.ts';
+import { DEFAULT_THEME, type ThemeId } from '../config/theme.ts';
 import { t, type Lang } from '../i18n/index.ts';
 import { svg } from './icons.ts';
 
@@ -21,6 +22,7 @@ const EMPTY_SETTINGS: SettingsView = {
   reducedMotion: false,
   haptics: false,
   lang: 'zh',
+  theme: DEFAULT_THEME,
   schemaVersion: 0,
   configVersion: '',
 };
@@ -42,6 +44,7 @@ export function createSettings(handlers: {
   setReducedMotion(value: boolean): void;
   setHaptics(value: boolean): void;
   setLang(lang: Lang): void;
+  setTheme(theme: ThemeId): void;
   resetSave(): void;
   goToTitle(): void;
 }): SettingsScreen {
@@ -92,6 +95,20 @@ export function createSettings(handlers: {
     h('div', 'langbtns', [zhBtn, enBtn]),
   ]);
 
+  // --- skin ---------------------------------------------------------------
+  // Same segmented pattern as the language row. It must stay AFTER that row:
+  // scripts/visual-i18n.mjs reads the first `.switch__label` on this screen.
+  const candyBtn = h('button', 'skinbtn', [t('Candy')]);
+  const emberBtn = h('button', 'skinbtn', [t('Ember')]);
+  candyBtn.type = 'button';
+  emberBtn.type = 'button';
+  candyBtn.addEventListener('click', () => handlers.setTheme('candy'));
+  emberBtn.addEventListener('click', () => handlers.setTheme('ember'));
+  const skinRow = h('div', 'settings__skin', [
+    h('span', 'switch__label', [t('Skin')]),
+    h('div', 'skinbtns', [candyBtn, emberBtn]),
+  ]);
+
   const reset = h('button', 'btn btn--danger', [t('Reset save')]);
   reset.type = 'button';
   let resetArmed = false;
@@ -131,6 +148,7 @@ export function createSettings(handlers: {
       panelHead([h('div', 'panel__title', [back, h('h1', 'panel__heading', [t('Settings')])])]),
       panelBody([
         langRow,
+        skinRow,
         h('div', 'settings__group', [sound.root, motion.root, haptics.root]),
         h('div', 'settings__group settings__group--danger', [
           h('p', 'settings__note', [t('Erasing your save removes cash, cards and level progress.')]),
@@ -159,6 +177,9 @@ export function createSettings(handlers: {
       const lang: Lang = v.lang === 'en' ? 'en' : 'zh';
       zhBtn.classList.toggle('is-on', lang === 'zh');
       enBtn.classList.toggle('is-on', lang === 'en');
+      const theme: ThemeId = v.theme === 'ember' ? 'ember' : 'candy';
+      candyBtn.classList.toggle('is-on', theme === 'candy');
+      emberBtn.classList.toggle('is-on', theme === 'ember');
       setText(
         version,
         t('Save v{n} · Config {v}', { n: Math.round(num(v.schemaVersion)), v: text(v.configVersion, 'unknown') }),

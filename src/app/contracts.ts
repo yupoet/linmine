@@ -9,6 +9,7 @@
  */
 
 import type { ChestTier, Settlement } from '../config/economy.ts';
+import type { ThemeId } from '../config/theme.ts';
 import type { TargetInfo } from '../core/run.ts';
 import type { Cell, DigResult, RunState, RunStats } from '../core/types.ts';
 
@@ -90,6 +91,7 @@ export interface SettingsView {
   reducedMotion: boolean;
   haptics: boolean;
   lang: 'zh' | 'en';
+  theme: ThemeId;
   schemaVersion: number;
   configVersion: string;
 }
@@ -119,6 +121,7 @@ export interface UIHandlers {
   setReducedMotion(value: boolean): void;
   setHaptics(value: boolean): void;
   setLang(lang: 'zh' | 'en'): void;
+  setTheme(theme: ThemeId): void;
   resetSave(): void;
   dismissTutorial(): void;
 }
@@ -137,6 +140,8 @@ export interface UIAPI {
   toast(message: string): void;
   /** Non-blocking nudge shown on the HUD, e.g. "Unreachable". */
   hint(message: string): void;
+  /** Paint the chosen skin: sets `data-theme` on <html> and on the UI root. */
+  setTheme(theme: ThemeId): void;
   dispose(): void;
 }
 
@@ -180,4 +185,6 @@ export interface RendererAPI {
   /** Cheap stats for the perf panel. */
   stats(): { fps: number; drawCalls: number; instances: number };
   dispose(): void;
+  /** Swap the visual skin. Rebuilding is deferred until the scene is idle. */
+  setTheme(theme: ThemeId): void;
 }
