@@ -1,0 +1,802 @@
+/* =========================================================================
+   Lin Mine — candy skin.
+
+   Imported from styles.css. Everything here is scoped to
+   `.ui[data-theme="candy"]`, so it is inert for the ember skin and every rule
+   out-specifies its base counterpart no matter where the import lands.
+
+   Two parts:
+     1. the token block — the whole palette and the shape slots, which is most
+        of the skin: cream panels, chocolate outlines, thick button edges;
+     2. a short list of override blocks, only where candy's *geometry* differs
+        from ember's and a token swap cannot express it (speech-bubble toast,
+        cherry close button, family bands, star pips, the title hero).
+
+   Source of truth for every value: docs/art/STYLE_BIBLE.md §2 (palette),
+   §3 (line/shape), §5 (UI), §6 (screens).
+   ========================================================================= */
+
+.ui[data-theme='candy'] {
+  /* ---- bible §2.1 base --------------------------------------------------- */
+  --cream-50: #fff8e7;
+  --cream-100: #f7ecd2;
+  --cream-200: #eedcb5;
+  --tan-300: #e3c48c;
+  --tan-400: #cfa86a;
+  --cocoa-600: #8a5a2e;
+  --cocoa-800: #5a3a1e;
+  --cocoa-900: #3d2612;
+
+  /* ---- bible §2.2 candy colours ----------------------------------------- */
+  --sun: #ffcc33;
+  --sun-dk: #e08a1a;
+  --sun-lt: #fff0a6;
+  --tangerine: #ff9a3c;
+  --tangerine-dk: #d9641c;
+  --tangerine-lt: #ffc98f;
+  --cherry: #e8453c;
+  --cherry-dk: #a8261f;
+  --cherry-lt: #ff8a80;
+  --mint: #8fd7a3;
+  --mint-dk: #3f9a5c;
+  --mint-lt: #c9f2d2;
+  --sky: #7fc7ea;
+  --sky-dk: #3a86b7;
+  --sky-lt: #c4e8f8;
+  --blossom: #f7a8c4;
+  --lilac: #b7a3d9;
+  --caramel: #c8874a;
+  --caramel-dk: #8a5424;
+  /* One step below the bible's *-dk, used only for the 3D bottom edge of a
+     button whose fill already ends on *-dk. Mint and sky are pale enough that
+     cream labels need the darker fill; the edge then needs somewhere to go. */
+  --mint-ed: #2f7847;
+  --sky-ed: #2a688f;
+
+  /* ---- palette slots ----------------------------------------------------- */
+  /* Surfaces read light-to-dark the way ember's soil ramp read dark-to-light,
+     so every gradient written once in styles.css still lands the right way up:
+     a card's "top" is the brightest cream, its "bottom" the next cream down. */
+  --soil-900: var(--tan-300);
+  --soil-850: var(--cream-100);
+  --soil-800: var(--cream-200);
+  --soil-700: var(--cream-50);
+  --soil-600: var(--tan-400);
+  --soil-500: var(--cream-50);
+  --clay: var(--cocoa-600);
+  /* amber-300 was ember's "bright emphasis"; on cream that role is chocolate. */
+  --amber-300: var(--cocoa-800);
+  --amber-400: var(--tangerine);
+  --amber-500: var(--tangerine-dk);
+  --copper: var(--caramel-dk);
+  --gold: var(--sun);
+  --cream: var(--cocoa-800);
+  --muted: var(--cocoa-600);
+  --good: var(--mint-dk);
+  --bad: var(--cherry);
+  --ink: var(--cocoa-900);
+
+  --scrim: radial-gradient(120% 80% at 50% 0%, var(--sky-lt) 0%, var(--sky) 55%, var(--sky-dk) 100%);
+  --panel-bg: var(--cream-100);
+  --line: var(--tan-300);
+  --line-strong: var(--tan-400);
+  --shadow-lift: 0 0.75rem 2rem rgba(61, 38, 18, 0.22);
+
+  --gold-lt: var(--sun-lt);
+  --gold-dk: var(--sun-dk);
+  --gold-ink: var(--cocoa-900);
+  --good-ink: var(--cream-50);
+  --good-soft: var(--mint-dk);
+  --bad-lt: var(--cherry-lt);
+  --bad-dk: var(--cherry-dk);
+  --bad-ink: var(--cream-50);
+  --bad-soft: var(--cherry-lt);
+  --copper-dk: var(--caramel-dk);
+  --copper-ink: var(--cream-50);
+  --emboss: var(--cocoa-800);
+  --tut-bg-top: var(--cream-50);
+  --tut-bg-bot: var(--cream-100);
+
+  --seg-bg: var(--cream-200);
+  --seg-radius: 999px;
+  --seg-border: var(--tan-400);
+  --seg-ink: var(--cocoa-600);
+  --seg-on-bg: linear-gradient(180deg, var(--tangerine-lt), var(--tangerine));
+  --seg-on-border: var(--cocoa-800);
+  --seg-on-ink: var(--cream-50);
+
+  /* Opaque cream and tan replace ember's translucent black wells. */
+  --face-bg: var(--cream-200);
+  --pip-bg: var(--tan-300);
+  --well-soft: var(--cream-50);
+  --well-bg: var(--cream-50);
+  --well-deep: var(--cream-50);
+  --stat-bg: var(--cream-50);
+  --tag-bg: var(--cream-50);
+  --stamp-bg: var(--cream-200);
+  --track-bg: var(--tan-400);
+  --trough-bg: var(--tan-300);
+  --hint-bg: var(--cream-50);
+  --pause-bg: var(--cream-50);
+
+  /* ---- shape slots (bible §3, §5.1) -------------------------------------- */
+  --radius: 1.4rem;
+  --radius-sm: 0.9rem;
+  --outline-w: 2px;
+  --outline-c: var(--cocoa-800);
+  --panel-outline-w: 2px;
+  --stroke-w: 1.5px;
+  --stroke-w-lg: 3px;
+  --stroke-c: var(--cocoa-800);
+  /* Plain .btn is the secondary button: sky. Variants below take it from here. */
+  --btn-bg: linear-gradient(180deg, var(--sky), var(--sky-dk));
+  --btn-ink: var(--cream-50);
+  --btn-text: none;
+  --btn-edge: 4px;
+  --btn-edge-down: 0px;
+  --btn-edge-c: var(--sky-ed);
+  --btn-hl: 0.14rem;
+  --btn-hl-c: rgba(255, 255, 255, 0.45);
+  --btn-press-y: 3px;
+  --panel-inset: inset 0 0.5rem 0 var(--cream-50);
+  --chip-bg: rgba(61, 38, 18, 0.85);
+  --chip-ink: var(--cream-50);
+  --toast-bg: var(--cream-50);
+  --toast-ink: var(--cocoa-800);
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Bible §5.2: system rounded stack, no web fonts (PWA offline + CSP). */
+  font-family:
+    ui-rounded, 'SF Pro Rounded', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    'Noto Sans CJK SC', 'Segoe UI Variable Display', system-ui, -apple-system, sans-serif;
+  font-weight: 700;
+}
+
+/* ------------------------------------------------------------------ panel */
+
+/* Full-height sheets rather than floating cards, so the chocolate outline
+   runs down the sides only; the head and foot bands close it off. */
+.ui[data-theme='candy'] .panel {
+  border-inline: var(--panel-outline-w) solid var(--outline-c);
+}
+
+.ui[data-theme='candy'] .panel__head {
+  /* cream-50 highlight strip over a cream-200 title band (bible §5.1). */
+  background: linear-gradient(
+    180deg,
+    var(--cream-50) 0,
+    var(--cream-50) 0.4rem,
+    var(--cream-200) 0.4rem,
+    var(--cream-200) 100%
+  );
+  border-bottom: 2px solid var(--outline-c);
+}
+
+.ui[data-theme='candy'] .panel__heading {
+  color: var(--cocoa-800);
+  text-shadow: none;
+  /* Chocolate on cream needs no contrast stroke, only weight: a hairline of
+     the same colour thickens the rounded type without filling in the counters
+     of dense CJK glyphs the way the 1.5px button stroke would. */
+  -webkit-text-stroke: 0.6px var(--stroke-c);
+  paint-order: stroke fill;
+}
+
+.ui[data-theme='candy'] .panel__foot {
+  background: var(--cream-200);
+  border-top: 2px solid var(--outline-c);
+}
+
+.ui[data-theme='candy'] .section__title {
+  color: var(--caramel-dk);
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+/* Each variant only moves the four button slots; the slab geometry is the
+   base rule in styles.css. Bible §5.1: tangerine primary, sky secondary,
+   mint confirm/buy, cherry danger. */
+.ui[data-theme='candy'] .btn--primary {
+  --btn-bg: linear-gradient(180deg, var(--tangerine-lt), var(--tangerine));
+  --btn-ink: var(--cream-50);
+  --btn-edge-c: var(--tangerine-dk);
+  --btn-text: none;
+}
+
+.ui[data-theme='candy'] .btn--gold {
+  --btn-bg: linear-gradient(180deg, var(--mint), var(--mint-dk));
+  --btn-ink: var(--cream-50);
+  --btn-edge-c: var(--mint-ed);
+}
+
+.ui[data-theme='candy'] .btn--danger {
+  --btn-bg: linear-gradient(180deg, var(--cherry-lt), var(--cherry));
+  --btn-ink: var(--cream-50);
+  --btn-edge-c: var(--cherry-dk);
+}
+
+.ui[data-theme='candy'] .btn--ghost,
+.ui[data-theme='candy'] .btn--quiet,
+.ui[data-theme='candy'] .btn.is-quiet {
+  --btn-bg: linear-gradient(180deg, var(--cream-50), var(--cream-200));
+  --btn-ink: var(--cocoa-800);
+  --btn-edge-c: var(--tan-400);
+  --btn-hl-c: rgba(255, 255, 255, 0.6);
+  --stroke-c: transparent;
+  border: var(--outline-w) solid var(--outline-c);
+  box-shadow:
+    0 var(--btn-edge) 0 var(--btn-edge-c),
+    0 var(--btn-edge) 0 var(--outline-w) var(--outline-c),
+    inset 0 var(--btn-hl) 0 var(--btn-hl-c);
+}
+
+.ui[data-theme='candy'] .btn--quiet,
+.ui[data-theme='candy'] .btn.is-quiet {
+  --btn-ink: var(--caramel-dk);
+}
+
+/* `.ui button { color: inherit }` in styles.css out-specifies the base `.btn`
+   rule, which is why ember's buttons have always inherited the panel ink and
+   `--btn-ink` sat dead there. Candy claims it back at a specificity that wins,
+   leaving ember's cascade exactly as it was. */
+.ui[data-theme='candy'] .btn {
+  color: var(--btn-ink);
+}
+
+/* The chocolate text stroke is what keeps cream labels legible on saturated
+   candy fills. Cocoa-on-cream buttons already have their contrast, and a
+   same-colour stroke there just clogs the counters of dense CJK glyphs. */
+.ui[data-theme='candy'] .btn--ghost,
+.ui[data-theme='candy'] .btn--quiet,
+.ui[data-theme='candy'] .btn.is-quiet {
+  -webkit-text-stroke-width: 0;
+}
+
+/* Icon tiles: cream-200 face, tan bevel, dark glyph (bible §5.1). */
+.ui[data-theme='candy'] .iconbtn {
+  border: var(--outline-w) solid var(--outline-c);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, var(--cream-50), var(--cream-200));
+  color: var(--cocoa-800);
+  box-shadow: 0 3px 0 var(--tan-400);
+}
+
+.ui[data-theme='candy'] .iconbtn:active {
+  transform: translateY(3px) scale(0.97);
+  background: var(--cream-200);
+  box-shadow: 0 0 0 var(--tan-400);
+}
+
+/* The panel's close / back affordance: cherry square with a white glyph,
+   nudged out over the panel edge (bible §5.1). */
+.ui[data-theme='candy'] .iconbtn--close {
+  margin-left: -0.35rem;
+  background: linear-gradient(180deg, var(--cherry-lt), var(--cherry));
+  color: var(--cream-50);
+  box-shadow: 0 3px 0 var(--cherry-dk);
+}
+
+.ui[data-theme='candy'] .iconbtn--close:active {
+  background: var(--cherry);
+  box-shadow: 0 0 0 var(--cherry-dk);
+}
+
+.ui[data-theme='candy'] .iconbtn--close .icon {
+  stroke-width: 2.6;
+}
+
+/* ------------------------------------------------------------------ chips */
+
+.ui[data-theme='candy'] .chip {
+  border: var(--outline-w) solid var(--outline-c);
+  border-radius: 999px;
+}
+
+/* Bible §5.1: the coin sits in its own sun disc hanging off the pill's left. */
+.ui[data-theme='candy'] .chip--cash {
+  position: relative;
+  overflow: visible;
+  padding-left: 1.6rem;
+  margin-left: 0.6rem;
+}
+
+.ui[data-theme='candy'] .chip--cash .chip__icon {
+  position: absolute;
+  left: -0.75rem;
+  top: 50%;
+  width: 1.9rem;
+  height: 1.9rem;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  border: var(--outline-w) solid var(--outline-c);
+  background: radial-gradient(circle at 50% 32%, var(--sun-lt), var(--sun) 70%, var(--sun-dk));
+  color: var(--cocoa-900);
+}
+
+.ui[data-theme='candy'] .chip__value {
+  text-shadow: none;
+}
+
+/* Secondary ink inside a chip sits on cocoa, not on cream. */
+.ui[data-theme='candy'] .chip .hud__of {
+  color: var(--tan-300);
+}
+
+.ui[data-theme='candy'] .chip--chain .chip__icon {
+  color: var(--tangerine-lt);
+}
+
+/* ----------------------------------------------------------------- gauges */
+
+/* Bible §5.1: tan trough with a chocolate outline, mint round-capped fill and
+   a sun star pinned to the left end. */
+.ui[data-theme='candy'] .bar {
+  overflow: visible;
+  border: var(--outline-w) solid var(--outline-c);
+  background: var(--tan-300);
+  box-shadow: none;
+}
+
+.ui[data-theme='candy'] .bar__fill {
+  background: linear-gradient(180deg, var(--mint-lt), var(--mint) 60%, var(--mint-dk));
+}
+
+.ui[data-theme='candy'] .chip--dura .bar::before {
+  content: '';
+  position: absolute;
+  left: -0.5rem;
+  top: 50%;
+  width: 0.85rem;
+  height: 0.85rem;
+  transform: translateY(-50%);
+  background: var(--sun);
+  clip-path: polygon(
+    50% 0%,
+    61% 35%,
+    98% 35%,
+    68% 57%,
+    79% 91%,
+    50% 70%,
+    21% 91%,
+    32% 57%,
+    2% 35%,
+    39% 35%
+  );
+}
+
+.ui[data-theme='candy'] .chip--dura.is-critical .bar__fill {
+  background: linear-gradient(180deg, var(--cherry-lt), var(--cherry));
+}
+
+.ui[data-theme='candy'] .bar--vertical .bar__fill {
+  background: linear-gradient(180deg, var(--sun-lt), var(--sun) 55%, var(--sun-dk));
+}
+
+.ui[data-theme='candy'] .bar__flag {
+  background: var(--cherry);
+  box-shadow: 0 0 0 2px var(--outline-c);
+}
+
+/* -------------------------------------------------------------------- hud */
+
+.ui[data-theme='candy'] .hud__level,
+.ui[data-theme='candy'] .hud__depth-goal {
+  color: var(--cocoa-800);
+  text-shadow: 0 0.08rem 0 var(--cream-50);
+}
+
+.ui[data-theme='candy'] .hud__depth-read {
+  color: var(--cocoa-800);
+  text-shadow:
+    0 0.08rem 0 var(--cream-50),
+    0 0 0.4rem var(--cream-50);
+}
+
+.ui[data-theme='candy'] .hud__hint {
+  border: var(--outline-w) solid var(--outline-c);
+  color: var(--cocoa-800);
+}
+
+.ui[data-theme='candy'] .hud__banner {
+  color: var(--cream-50);
+  text-shadow: none;
+  -webkit-text-stroke: var(--stroke-w-lg) var(--stroke-c);
+  paint-order: stroke fill;
+}
+
+/* ------------------------------------------------------------------ cards */
+
+/* Cream card face, tan double frame, chocolate outline and a family-coloured
+   band across the top (bible §5.1). */
+.ui[data-theme='candy'] .card,
+.ui[data-theme='candy'] .levelcard {
+  border: var(--outline-w) solid var(--outline-c);
+  box-shadow:
+    0 4px 0 var(--tan-400),
+    0 4px 0 var(--outline-w) var(--outline-c),
+    inset 0 0 0 2px var(--tan-300);
+}
+
+.ui[data-theme='candy'] .card {
+  --band: var(--tan-300);
+  border-top: 0.5rem solid var(--band);
+}
+
+.ui[data-theme='candy'] .card--generation {
+  --band: var(--mint);
+}
+
+.ui[data-theme='candy'] .card--income {
+  --band: var(--sun);
+}
+
+.ui[data-theme='candy'] .card--durability {
+  --band: var(--sky);
+}
+
+.ui[data-theme='candy'] .card--chain {
+  --band: var(--cherry);
+}
+
+.ui[data-theme='candy'] .card.is-selected {
+  border-color: var(--outline-c);
+  /* The family band must survive selection, so only the other three edges go
+     chocolate; the ring rides outside them. */
+  border-top-color: var(--band);
+  box-shadow:
+    0 0 0 3px var(--tangerine),
+    0 4px 0 var(--tan-400),
+    0 4px 0 var(--outline-w) var(--outline-c);
+}
+
+.ui[data-theme='candy'] .card.is-selected::after {
+  background: var(--tangerine);
+  border: 2px solid var(--outline-c);
+  box-shadow: none;
+}
+
+.ui[data-theme='candy'] .card.is-locked,
+.ui[data-theme='candy'] .levelcard.is-locked {
+  opacity: 1;
+  filter: none;
+  background: linear-gradient(180deg, var(--cream-200), var(--tan-300));
+  color: var(--cocoa-600);
+}
+
+.ui[data-theme='candy'] .levelcard.is-locked .levelcard__name {
+  color: var(--cocoa-600);
+}
+
+.ui[data-theme='candy'] .levelcard.is-cleared {
+  border-color: var(--outline-c);
+  box-shadow:
+    0 0 0 3px var(--mint),
+    0 4px 0 var(--tan-400),
+    0 4px 0 var(--outline-w) var(--outline-c);
+}
+
+.ui[data-theme='candy'] .levelcard__index {
+  color: var(--cocoa-800);
+}
+
+/* Level pips read as small stars, matching the sun stars used everywhere else
+   for "how much of this do you have". */
+.ui[data-theme='candy'] .pip {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 0;
+  clip-path: polygon(
+    50% 0%,
+    61% 35%,
+    98% 35%,
+    68% 57%,
+    79% 91%,
+    50% 70%,
+    21% 91%,
+    32% 57%,
+    2% 35%,
+    39% 35%
+  );
+}
+
+.ui[data-theme='candy'] .pip.is-on {
+  background: var(--sun);
+}
+
+.ui[data-theme='candy'] .tag {
+  border: 1.5px solid var(--tan-400);
+  color: var(--cocoa-800);
+}
+
+.ui[data-theme='candy'] .stat {
+  border: var(--outline-w) solid var(--outline-c);
+}
+
+/* ----------------------------------------------------------------- result */
+
+.ui[data-theme='candy'] .result__hero {
+  background: linear-gradient(180deg, var(--cream-50), var(--cream-100));
+  border-bottom: 2px solid var(--outline-c);
+}
+
+/* Bible §6: a tangerine banner carries the verdict, in stroked cream type. */
+.ui[data-theme='candy'] .result__headline {
+  /* A block that shrink-wraps: inline-block would let the stamp and the level
+     name flow alongside it. */
+  display: block;
+  width: fit-content;
+  margin: 0.6rem auto 0.85rem;
+  padding: 0.35rem 1.4rem;
+  border: var(--outline-w) solid var(--outline-c);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--tangerine-lt), var(--tangerine));
+  color: var(--cream-50);
+  text-shadow: none;
+  -webkit-text-stroke: var(--stroke-w-lg) var(--stroke-c);
+  paint-order: stroke fill;
+  box-shadow: 0 4px 0 var(--tangerine-dk), 0 4px 0 var(--outline-w) var(--outline-c);
+}
+
+.ui[data-theme='candy'] .result__stamp {
+  border: var(--outline-w) solid var(--outline-c);
+  color: var(--cocoa-800);
+}
+
+.ui[data-theme='candy'] .screen--result.is-win .result__stamp {
+  border-color: var(--outline-c);
+}
+
+.ui[data-theme='candy'] .screen--result.is-loss .result__stamp {
+  border-color: var(--outline-c);
+}
+
+.ui[data-theme='candy'] .result__payout {
+  color: var(--sun-dk);
+  text-shadow: none;
+}
+
+.ui[data-theme='candy'] .rowlist,
+.ui[data-theme='candy'] .statcard,
+.ui[data-theme='candy'] .draft__stat {
+  border: 1.5px solid var(--tan-400);
+}
+
+.ui[data-theme='candy'] .reward {
+  background: linear-gradient(180deg, var(--sun-lt), var(--cream-100));
+  border: var(--outline-w) solid var(--outline-c);
+}
+
+.ui[data-theme='candy'] .reward.is-empty {
+  background: var(--cream-50);
+  border-style: dashed;
+  border-color: var(--tan-400);
+}
+
+.ui[data-theme='candy'] .reward__chest,
+.ui[data-theme='candy'] .upgrade__art,
+.ui[data-theme='candy'] .crate__art {
+  border: var(--outline-w) solid var(--outline-c);
+}
+
+.ui[data-theme='candy'] .unlock {
+  background: var(--mint-lt);
+  border-color: var(--mint-dk);
+  color: var(--mint-dk);
+}
+
+.ui[data-theme='candy'] .pending {
+  background: var(--sun-lt);
+  border-color: var(--sun-dk);
+  color: var(--caramel-dk);
+}
+
+/* ------------------------------------------------------------------- shop */
+
+.ui[data-theme='candy'] .upgrade,
+.ui[data-theme='candy'] .crate {
+  border: var(--outline-w) solid var(--outline-c);
+  box-shadow: 0 4px 0 var(--tan-400), 0 4px 0 var(--outline-w) var(--outline-c);
+}
+
+/* Prices ride in a sun pill, the same coin currency as the HUD chip. */
+.ui[data-theme='candy'] .upgrade__cost,
+.ui[data-theme='candy'] .crate__cost {
+  padding: 0.15rem 0.6rem;
+  border: var(--outline-w) solid var(--outline-c);
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--sun-lt), var(--sun));
+  color: var(--cocoa-900);
+}
+
+.ui[data-theme='candy'] .crate--rare {
+  border-color: var(--outline-c);
+  box-shadow:
+    0 0 0 3px var(--sun),
+    0 4px 0 var(--tan-400),
+    0 4px 0 var(--outline-w) var(--outline-c);
+}
+
+/* --------------------------------------------------------------- settings */
+
+.ui[data-theme='candy'] .settings__lang,
+.ui[data-theme='candy'] .settings__skin {
+  border: var(--outline-w) solid var(--outline-c);
+}
+
+.ui[data-theme='candy'] .langbtn,
+.ui[data-theme='candy'] .skinbtn {
+  border-width: 2px;
+  font-weight: 800;
+}
+
+.ui[data-theme='candy'] .langbtn.is-on,
+.ui[data-theme='candy'] .skinbtn.is-on {
+  box-shadow: 0 3px 0 var(--tangerine-dk);
+}
+
+.ui[data-theme='candy'] .switch {
+  border: var(--outline-w) solid var(--outline-c);
+}
+
+.ui[data-theme='candy'] .switch.is-on {
+  background: var(--mint-lt);
+  border-color: var(--outline-c);
+}
+
+/* Bible §6: mint / tan capsule toggle with a cream knob. */
+.ui[data-theme='candy'] .switch__track {
+  border: var(--outline-w) solid var(--outline-c);
+  background: var(--tan-400);
+}
+
+.ui[data-theme='candy'] .switch.is-on .switch__track {
+  background: linear-gradient(180deg, var(--mint-lt), var(--mint));
+  border-color: var(--outline-c);
+}
+
+.ui[data-theme='candy'] .switch__knob {
+  top: 0.1rem;
+  left: 0.1rem;
+  background: var(--cream-50);
+  border: 2px solid var(--outline-c);
+  box-shadow: none;
+  transition: transform 0.16s var(--spring);
+}
+
+.ui[data-theme='candy'] .settings__version {
+  color: var(--cocoa-600);
+}
+
+/* -------------------------------------------------------- toast / tutorial */
+
+/* Bible §5.1: a cream speech bubble with a little tail. */
+.ui[data-theme='candy'] .toast {
+  position: relative;
+  border: var(--outline-w) solid var(--outline-c);
+  box-shadow: 0 3px 0 var(--tan-400);
+}
+
+.ui[data-theme='candy'] .toast::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -0.5rem;
+  width: 0.7rem;
+  height: 0.7rem;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--toast-bg);
+  border-right: var(--outline-w) solid var(--outline-c);
+  border-bottom: var(--outline-w) solid var(--outline-c);
+}
+
+.ui[data-theme='candy'] .tut {
+  background: var(--cream-50);
+  border: var(--outline-w) solid var(--outline-c);
+  box-shadow: 0 5px 0 var(--tan-400), 0 0.75rem 2rem rgba(61, 38, 18, 0.2);
+}
+
+.ui[data-theme='candy'] .tut__tail,
+.ui[data-theme='candy'] .tut--hud .tut__tail {
+  background: var(--cream-50);
+  border: 0;
+  border-right: var(--outline-w) solid var(--outline-c);
+  border-bottom: var(--outline-w) solid var(--outline-c);
+}
+
+.ui[data-theme='candy'] .tut--hud .tut__tail {
+  border: 0;
+  border-left: var(--outline-w) solid var(--outline-c);
+  border-top: var(--outline-w) solid var(--outline-c);
+}
+
+/* ------------------------------------------------------------------ title */
+
+/* Bible §6: daytime sky over a grass horizon, a tangerine logo banner and a
+   single big mint call to action. */
+.ui[data-theme='candy'] .screen--title .panel {
+  background:
+    radial-gradient(120% 55% at 50% 118%, var(--mint-lt) 0 58%, transparent 60%),
+    linear-gradient(180deg, var(--sky-lt) 0%, var(--sky) 62%, var(--mint-lt) 100%);
+}
+
+.ui[data-theme='candy'] .screen--title .panel__foot {
+  background: transparent;
+  border-top: 0;
+}
+
+.ui[data-theme='candy'] .title__crest {
+  background: radial-gradient(circle at 50% 32%, var(--cream-50), var(--cream-200) 72%);
+  border: var(--outline-w) solid var(--outline-c);
+  box-shadow: 0 5px 0 var(--tan-400), inset 0 0 0 4px var(--tan-300);
+}
+
+.ui[data-theme='candy'] .crest__icon {
+  color: var(--tangerine);
+}
+
+.ui[data-theme='candy'] .crest__gem {
+  color: var(--sun);
+}
+
+.ui[data-theme='candy'] .title__name {
+  display: inline-block;
+  padding: 0.5rem 1.8rem 0.6rem;
+  border: var(--outline-w) solid var(--outline-c);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--tangerine-lt), var(--tangerine) 55%, var(--tangerine-dk));
+  color: var(--cream-50);
+  text-shadow: none;
+  -webkit-text-stroke: var(--stroke-w-lg) var(--stroke-c);
+  paint-order: stroke fill;
+  box-shadow: 0 6px 0 var(--tangerine-dk), 0 6px 0 var(--outline-w) var(--outline-c);
+}
+
+.ui[data-theme='candy'] .title__tagline {
+  color: var(--cocoa-800);
+  font-weight: 700;
+  text-shadow: 0 0.08rem 0 var(--cream-50);
+}
+
+/* The single primary action on the title screen is mint, not tangerine: the
+   banner already owns tangerine on this screen. */
+.ui[data-theme='candy'] .screen--title .btn--primary {
+  --btn-bg: linear-gradient(180deg, var(--mint), var(--mint-dk));
+  --btn-edge-c: var(--mint-ed);
+  min-height: 4rem;
+  font-size: 1.35rem;
+}
+
+/* --------------------------------------------------------------- motion */
+
+/* Bible §5.3: springy, and never longer than 400ms. The blanket .ui--calm and
+   prefers-reduced-motion rules in styles.css already cover everything here. */
+.ui[data-theme='candy'] .btn,
+.ui[data-theme='candy'] .iconbtn,
+.ui[data-theme='candy'] .card--tap,
+.ui[data-theme='candy'] .levelcard {
+  transition:
+    transform 0.16s var(--spring),
+    box-shadow 0.16s var(--spring),
+    filter 0.15s ease;
+}
+
+.ui[data-theme='candy'] .screen {
+  transition:
+    opacity 0.2s ease,
+    transform 0.28s var(--spring),
+    visibility 0.28s linear;
+}
+
+.ui[data-theme='candy'] .toast {
+  transition:
+    opacity 0.18s ease,
+    transform 0.3s var(--spring);
+}
+
+.ui[data-theme='candy'] .tut {
+  transition:
+    opacity 0.2s ease,
+    transform 0.3s var(--spring);
+}

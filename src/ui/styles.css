@@ -1,8 +1,27 @@
+/* The candy skin lives in its own file so this one stays readable; every
+   rule there is scoped to `.ui[data-theme="candy"]` and out-specifies its
+   base counterpart, so the import order does not matter. Vite inlines it. */
+@import './theme-candy.css';
+
 /* =========================================================================
    Lin Mine — DOM UI.
-   Warm earthy arcade look: soil browns, torch amber, copper and gold on a
-   dark background. Everything is sized in rem / dvh, every tap target is at
-   least 44px, and every animation can be switched off (see .ui--calm).
+
+   One structure, two skins. This base `.ui` block IS the **ember** skin: the
+   warm earthy arcade look of soil browns, torch amber, copper and gold on a
+   dark background. `.ui[data-theme="candy"]` (bottom of this file) redefines
+   the same slots for the bright cream-and-chocolate candy skin — no rule is
+   duplicated, only the tokens change, plus a handful of shape overrides where
+   candy's geometry genuinely differs (thick button edges, stroked text,
+   speech-bubble toasts).
+
+   Everything is sized in rem / dvh, every tap target is at least 44px, and
+   every animation can be switched off (see .ui--calm).
+
+   Token groups below:
+     palette — colour slots, per skin
+     shape   — geometry slots (outline, stroke, button edge, radius); the
+               values here reproduce today's ember CSS exactly, so ember is
+               pixel-identical to the pre-skin build.
    ========================================================================= */
 
 .ui {
@@ -29,8 +48,75 @@
   --line: rgba(255, 190, 90, 0.18);
   --line-strong: rgba(255, 190, 90, 0.42);
   --shadow-lift: 0 0.75rem 2rem rgba(0, 0, 0, 0.45);
+
+  /* Semantic tints that used to be typed inline. Named so candy can move them
+     without hunting for hex literals. */
+  --gold-lt: #ffe9a8;
+  --gold-dk: #e0a92c;
+  --gold-ink: #4a2c02;
+  --good-ink: #123c06;
+  --good-soft: #d9f2c9;
+  --bad-lt: #ff8a72;
+  --bad-dk: #d63a22;
+  --bad-ink: #2b0a03;
+  --bad-soft: #ff8f75;
+  --copper-dk: #8c4a16;
+  --copper-ink: #3d0c02;
+  --emboss: #7a4406;
+  --tut-bg-top: #4a301a;
+  --tut-bg-bot: #241609;
+
+  /* Segmented controls (language / skin rows). */
+  --seg-bg: rgba(255, 255, 255, 0.05);
+  --seg-radius: 14px;
+  --seg-border: rgba(255, 255, 255, 0.14);
+  --seg-ink: rgba(246, 236, 224, 0.75);
+  --seg-on-bg: linear-gradient(180deg, #ffd977, #f0a942);
+  --seg-on-border: #f0a942;
+  --seg-on-ink: #40270c;
+
+  /* ---- shape ------------------------------------------------------------ */
+  /* Ember draws no outlines and no text strokes; every slot below is a
+     deliberate no-op that candy switches on. */
   --radius: 1.1rem;
   --radius-sm: 0.75rem;
+  --outline-w: 0;
+  --outline-c: transparent;
+  --panel-outline-w: 0;
+  --stroke-w: 0;
+  --stroke-w-lg: 0;
+  --stroke-c: transparent;
+  --btn-bg: var(--soil-600);
+  --btn-ink: var(--cream);
+  --btn-text: none;
+  --btn-edge: 0.25rem;
+  --btn-edge-down: 0.05rem;
+  --btn-edge-c: rgba(0, 0, 0, 0.4);
+  --btn-hl: 0.08rem;
+  --btn-hl-c: rgba(255, 255, 255, 0.16);
+  --btn-press-y: 0.18rem;
+  --panel-inset: 0 0 0 0 transparent;
+  --chip-bg: rgba(18, 11, 7, 0.74);
+  --chip-ink: var(--cream);
+  --toast-bg: rgba(18, 11, 7, 0.94);
+  --toast-ink: var(--amber-300);
+  --spring: cubic-bezier(0.3, 1.4, 0.5, 1);
+
+  /* Recessed / raised surfaces. Ember paints them as translucent black or
+     white over the scrim; candy swaps in opaque cream and tan. Each role has
+     its own slot so no ember value had to be rounded to share one. */
+  --face-bg: rgba(255, 255, 255, 0.06);
+  --pip-bg: rgba(255, 255, 255, 0.16);
+  --well-soft: rgba(0, 0, 0, 0.24);
+  --well-bg: rgba(0, 0, 0, 0.26);
+  --well-deep: rgba(0, 0, 0, 0.28);
+  --stat-bg: rgba(0, 0, 0, 0.3);
+  --tag-bg: rgba(0, 0, 0, 0.32);
+  --stamp-bg: rgba(0, 0, 0, 0.35);
+  --track-bg: rgba(0, 0, 0, 0.5);
+  --trough-bg: rgba(0, 0, 0, 0.55);
+  --hint-bg: rgba(18, 11, 7, 0.9);
+  --pause-bg: rgba(20, 12, 8, 0.72);
 
   position: fixed;
   inset: 0;
@@ -122,7 +208,8 @@
   max-width: 34rem;
   height: 100%;
   background: var(--panel-bg);
-  box-shadow: var(--shadow-lift);
+  /* --panel-inset is candy's top highlight band; ember leaves it invisible. */
+  box-shadow: var(--shadow-lift), var(--panel-inset);
   overflow: hidden;
 }
 
@@ -209,16 +296,23 @@
   gap: 0.45rem;
   min-height: 2.9rem;
   padding: 0.5rem 1.1rem;
-  border: 0;
+  border: var(--outline-w) solid var(--outline-c);
   border-radius: 0.9rem;
   font-weight: 800;
   letter-spacing: 0.01em;
   cursor: pointer;
-  background: var(--soil-600);
-  color: var(--cream);
+  /* Variants only ever set --btn-bg / --btn-ink / --btn-edge-c / --btn-text;
+     the slab geometry (thick bottom edge, top highlight, outline around the
+     whole silhouette) is written once, here. */
+  background: var(--btn-bg);
+  color: var(--btn-ink);
+  text-shadow: var(--btn-text);
+  -webkit-text-stroke: var(--stroke-w) var(--stroke-c);
+  paint-order: stroke fill;
   box-shadow:
-    0 0.25rem 0 rgba(0, 0, 0, 0.4),
-    inset 0 0.08rem 0 rgba(255, 255, 255, 0.16);
+    0 var(--btn-edge) 0 var(--btn-edge-c),
+    0 var(--btn-edge) 0 var(--outline-w) var(--outline-c),
+    inset 0 var(--btn-hl) 0 var(--btn-hl-c);
   transition:
     transform 0.1s ease,
     box-shadow 0.1s ease,
@@ -227,10 +321,11 @@
 }
 
 .btn:active:not(:disabled) {
-  transform: translateY(0.18rem) scale(0.985);
+  transform: translateY(var(--btn-press-y)) scale(0.985);
   box-shadow:
-    0 0.05rem 0 rgba(0, 0, 0, 0.4),
-    inset 0 0.08rem 0 rgba(255, 255, 255, 0.16);
+    0 var(--btn-edge-down) 0 var(--btn-edge-c),
+    0 var(--btn-edge-down) 0 var(--outline-w) var(--outline-c),
+    inset 0 var(--btn-hl) 0 var(--btn-hl-c);
 }
 
 .btn:disabled {
@@ -239,26 +334,26 @@
 }
 
 .btn--primary {
-  background: linear-gradient(180deg, var(--amber-300), var(--amber-500));
-  color: var(--ink);
-  text-shadow: 0 0.06rem 0 rgba(255, 255, 255, 0.35);
+  --btn-bg: linear-gradient(180deg, var(--amber-300), var(--amber-500));
+  --btn-ink: var(--ink);
+  --btn-text: 0 0.06rem 0 rgba(255, 255, 255, 0.35);
 }
 
 .btn--gold {
-  background: linear-gradient(180deg, #ffe9a8, var(--gold) 55%, #e0a92c);
-  color: #4a2c02;
+  --btn-bg: linear-gradient(180deg, var(--gold-lt), var(--gold) 55%, var(--gold-dk));
+  --btn-ink: var(--gold-ink);
 }
 
 .btn--ghost {
-  background: rgba(255, 255, 255, 0.06);
+  --btn-bg: var(--face-bg);
+  --btn-ink: var(--cream);
   border: 1px solid var(--line);
-  color: var(--cream);
   box-shadow: 0 0.2rem 0 rgba(0, 0, 0, 0.35);
 }
 
 .btn--danger {
-  background: linear-gradient(180deg, #ff8a72, #d63a22);
-  color: #2b0a03;
+  --btn-bg: linear-gradient(180deg, var(--bad-lt), var(--bad-dk));
+  --btn-ink: var(--bad-ink);
 }
 
 .btn--danger.is-armed {
@@ -279,9 +374,9 @@
 
 .btn--quiet,
 .btn.is-quiet {
-  background: rgba(255, 255, 255, 0.06);
+  --btn-bg: var(--face-bg);
+  --btn-ink: var(--amber-300);
   border: 1px dashed var(--line-strong);
-  color: var(--amber-300);
 }
 
 .btn .icon {
@@ -309,7 +404,7 @@
   flex: 0 0 auto;
   border: 1px solid var(--line);
   border-radius: 0.85rem;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--face-bg);
   color: var(--cream);
   cursor: pointer;
   transition: transform 0.1s ease, background 0.15s ease;
@@ -340,7 +435,7 @@
   gap: 0.35rem;
   padding: 0.3rem 0.7rem;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--stat-bg);
   border: 1px solid var(--line);
   font-weight: 800;
   font-size: 0.95rem;
@@ -531,7 +626,7 @@
 .tag {
   padding: 0.2rem 0.55rem;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.32);
+  background: var(--tag-bg);
   border: 1px solid var(--line);
   font-size: 0.75rem;
   font-weight: 700;
@@ -582,7 +677,7 @@
   gap: 0.15rem;
   padding: 0.5rem 0.7rem;
   border-radius: var(--radius-sm);
-  background: rgba(0, 0, 0, 0.28);
+  background: var(--well-deep);
   border: 1px solid var(--line);
 }
 
@@ -723,7 +818,7 @@
   width: 0.55rem;
   height: 0.28rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--pip-bg);
 }
 
 .pip.is-on {
@@ -803,7 +898,7 @@
 .hud__pause {
   flex: 0 0 auto;
   pointer-events: auto;
-  background: rgba(20, 12, 8, 0.72);
+  background: var(--pause-bg);
 }
 
 .chip {
@@ -813,7 +908,8 @@
   padding: 0.4rem 0.75rem;
   min-height: 2.75rem;
   border-radius: 0.95rem;
-  background: rgba(18, 11, 7, 0.74);
+  background: var(--chip-bg);
+  color: var(--chip-ink);
   border: 1px solid var(--line);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
@@ -881,7 +977,7 @@
   height: 0.55rem;
   min-width: 3rem;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--trough-bg);
   box-shadow: inset 0 0.1rem 0.2rem rgba(0, 0, 0, 0.6);
   overflow: hidden;
 }
@@ -901,7 +997,7 @@
 }
 
 .chip--dura.is-critical .bar__fill {
-  background: linear-gradient(90deg, #ff8f75, var(--bad));
+  background: linear-gradient(90deg, var(--bad-soft), var(--bad));
 }
 
 .chip--dura.is-critical .chip__icon {
@@ -957,7 +1053,7 @@
   inset: 0 0 auto 0;
   width: 100%;
   height: 0;
-  background: linear-gradient(180deg, var(--gold), var(--copper) 60%, #8c4a16);
+  background: linear-gradient(180deg, var(--gold), var(--copper) 60%, var(--copper-dk));
   transition: height 0.2s ease-out;
 }
 
@@ -984,7 +1080,7 @@
   letter-spacing: 0.02em;
   color: var(--gold);
   text-shadow:
-    0 0.15rem 0 #7a4406,
+    0 0.15rem 0 var(--emboss),
     0 0 1.6rem rgba(255, 180, 60, 0.7);
   opacity: 0;
   pointer-events: none;
@@ -1001,7 +1097,7 @@
   transform: translateX(-50%);
   padding: 0.45rem 0.9rem;
   border-radius: 999px;
-  background: rgba(18, 11, 7, 0.9);
+  background: var(--hint-bg);
   border: 1px solid var(--line-strong);
   font-size: 0.85rem;
   font-weight: 800;
@@ -1035,19 +1131,19 @@
   font-weight: 900;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--stamp-bg);
   border: 1px solid var(--line);
   color: var(--muted);
 }
 
 .screen--result.is-win .result__stamp {
-  color: #123c06;
+  color: var(--good-ink);
   background: var(--good);
   border-color: transparent;
 }
 
 .screen--result.is-loss .result__stamp {
-  color: #3d0c02;
+  color: var(--copper-ink);
   background: var(--copper);
   border-color: transparent;
 }
@@ -1105,7 +1201,7 @@
   font-weight: 900;
   font-variant-numeric: tabular-nums;
   color: var(--gold);
-  text-shadow: 0 0.15rem 0 #7a4406;
+  text-shadow: 0 0.15rem 0 var(--emboss);
 }
 
 .result__coin {
@@ -1132,7 +1228,7 @@
   gap: 0.3rem;
   padding: 0.6rem 0.75rem;
   border-radius: var(--radius);
-  background: rgba(0, 0, 0, 0.26);
+  background: var(--well-bg);
   border: 1px solid var(--line);
 }
 
@@ -1183,7 +1279,7 @@
   gap: 0.1rem;
   padding: 0.6rem 0.4rem;
   border-radius: var(--radius-sm);
-  background: rgba(0, 0, 0, 0.26);
+  background: var(--well-bg);
   border: 1px solid var(--line);
 }
 
@@ -1214,7 +1310,7 @@
 }
 
 .reward.is-empty {
-  background: rgba(0, 0, 0, 0.24);
+  background: var(--well-soft);
   border-style: dashed;
 }
 
@@ -1281,7 +1377,7 @@
   font-weight: 800;
   background: rgba(134, 200, 106, 0.12);
   border: 1px solid rgba(134, 200, 106, 0.4);
-  color: #d9f2c9;
+  color: var(--good-soft);
 }
 
 .pending {
@@ -1543,7 +1639,7 @@
   text-align: left;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  background: rgba(0, 0, 0, 0.24);
+  background: var(--well-soft);
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
@@ -1575,7 +1671,7 @@
   height: 1.7rem;
   flex: 0 0 auto;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--track-bg);
   border: 1px solid var(--line);
   transition: background 0.15s ease;
 }
@@ -1621,11 +1717,11 @@
 .toast {
   padding: 0.55rem 1rem;
   border-radius: 999px;
-  background: rgba(18, 11, 7, 0.94);
+  background: var(--toast-bg);
   border: 1px solid var(--line-strong);
   font-size: 0.85rem;
   font-weight: 800;
-  color: var(--amber-300);
+  color: var(--toast-ink);
   box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.5);
   opacity: 0;
   transform: translateY(0.6rem) scale(0.96);
@@ -1647,7 +1743,7 @@
   transform: translate(-50%, 0.75rem);
   padding: 0.8rem 0.9rem 0.7rem;
   border-radius: var(--radius);
-  background: linear-gradient(180deg, #4a301a, #241609);
+  background: linear-gradient(180deg, var(--tut-bg-top), var(--tut-bg-bot));
   border: 1px solid var(--line-strong);
   box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.55);
   opacity: 0;
@@ -1695,7 +1791,7 @@
   width: 0.8rem;
   height: 0.8rem;
   transform: translateX(-50%) rotate(45deg);
-  background: #241609;
+  background: var(--tut-bg-bot);
   border-right: 1px solid var(--line-strong);
   border-bottom: 1px solid var(--line-strong);
 }
@@ -1703,7 +1799,7 @@
 .tut--hud .tut__tail {
   bottom: auto;
   top: -0.42rem;
-  background: #4a301a;
+  background: var(--tut-bg-top);
   border: 0;
   border-left: 1px solid var(--line-strong);
   border-top: 1px solid var(--line-strong);
@@ -1817,54 +1913,29 @@
 
 /* ------------------------------------------------------- reduced motion */
 
-.ui--calm .crest__icon,
-.ui--calm .crest__gem,
-.ui--calm .reward__spark,
-.ui--calm .chip--dura.is-critical,
-.ui--calm .pendingbtn,
-.ui--calm .btn--danger.is-armed {
-  animation: none !important;
-}
-
-.ui--calm .hud__banner.is-on,
-.ui--calm .hud__hint.is-on {
-  animation-duration: 0.001s;
-  opacity: 1;
-}
-
-.ui--calm .screen,
-.ui--calm .btn,
-.ui--calm .iconbtn,
-.ui--calm .levelcard,
-.ui--calm .card--tap,
-.ui--calm .switch__knob,
-.ui--calm .switch__track,
-.ui--calm .bar__fill,
-.ui--calm .toast,
-.ui--calm .tut {
-  transition-duration: 0.001s;
+/* Blanket, not an enumeration: a skin can add any animation it likes and Calm
+   motion still switches it off. Capping the iteration count is what makes this
+   equivalent to the old `animation: none` list — a looping decorative
+   animation would otherwise sit frozen on its last keyframe instead of
+   reverting to the element's own styles. `banner`/`hint` keep `forwards`, so
+   they still resolve to their end state, exactly as before. */
+.ui--calm,
+.ui--calm *,
+.ui--calm *::before,
+.ui--calm *::after {
+  animation-duration: 0.001s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001s !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ui .crest__icon,
-  .ui .crest__gem,
-  .ui .reward__spark,
-  .ui .chip--dura.is-critical,
-  .ui .pendingbtn,
-  .ui .btn--danger.is-armed {
-    animation: none !important;
-  }
-
-  .ui .screen,
-  .ui .btn,
-  .ui .iconbtn,
-  .ui .levelcard,
-  .ui .card--tap,
-  .ui .switch__knob,
-  .ui .bar__fill,
-  .ui .toast,
-  .ui .tut {
-    transition-duration: 0.001s;
+  .ui,
+  .ui *,
+  .ui *::before,
+  .ui *::after {
+    animation-duration: 0.001s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001s !important;
   }
 }
 
@@ -1895,9 +1966,10 @@
   }
 }
 
-/* --- language switcher ------------------------------------------------------ */
-/* The skin row reuses the language row's shape verbatim for now; the UI skin
-   stream restyles both. */
+/* --------------------------------------------- segmented rows (lang / skin) */
+/* Two identical rows in the settings panel. Language must stay first: the i18n
+   visual script reads the first `.switch__label` on this screen. */
+
 .settings__lang,
 .settings__skin {
   display: flex;
@@ -1905,31 +1977,34 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.7rem 0.9rem;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--seg-radius);
+  background: var(--seg-bg);
   margin-bottom: 0.75rem;
 }
+
 .langbtns,
 .skinbtns {
   display: flex;
   gap: 0.4rem;
 }
+
 .langbtn,
 .skinbtn {
   font: inherit;
   font-size: 0.9rem;
   padding: 0.42rem 0.9rem;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--seg-border);
   background: transparent;
-  color: rgba(246, 236, 224, 0.75);
+  color: var(--seg-ink);
   cursor: pointer;
   transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
 }
+
 .langbtn.is-on,
 .skinbtn.is-on {
-  background: linear-gradient(180deg, #ffd977, #f0a942);
-  border-color: #f0a942;
-  color: #40270c;
+  background: var(--seg-on-bg);
+  border-color: var(--seg-on-border);
+  color: var(--seg-on-ink);
   font-weight: 700;
 }

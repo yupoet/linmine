@@ -94,6 +94,12 @@ export function createCardTile(options: CardTileOptions = {}): CardTile {
         }
       }
 
+      // Family drives the card's top band colour in the candy skin. Purely a
+      // styling hook; the label above already carries the meaning.
+      for (const key of Object.keys(FAMILY_LABEL)) {
+        setFlag(el, `card--${key}`, key === text(c.family));
+      }
+
       setFlag(el, 'is-owned', owned);
       setFlag(el, 'is-locked', !owned);
       setFlag(el, 'is-selected', interactive && owned && c.selected === true);
