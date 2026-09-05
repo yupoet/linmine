@@ -54,6 +54,9 @@ export const EMBER_THEME: RenderTheme = {
   grass: 0x6aa84f,
   highlight: { affordable: 0x7cf0b4, tooExpensive: 0xff5a45, hovered: 0xfff3b0, breathe: 0 },
   particles: { dust: 0xb9a888, hitFlash: 0xffffff },
+  // Ember shipped with a bare gradient sky; dressing the backdrop would break
+  // pixel parity, so it stays off here.
+  backdrop: { enabled: false, cloud: 0x000000, star: 0x000000 },
   popups: {
     cash: '#eafff2',
     gold: '#ffd856',

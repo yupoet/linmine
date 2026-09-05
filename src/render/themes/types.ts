@@ -93,6 +93,17 @@ export interface ParticleTheme {
   readonly hitFlash: number;
 }
 
+/**
+ * Far-background dressing behind the block field: soft drifting clouds plus
+ * stars that fade in with depth. Ember keeps the bare gradient it shipped
+ * with, so this is disabled there (pixel parity).
+ */
+export interface BackdropTheme {
+  readonly enabled: boolean;
+  readonly cloud: number;
+  readonly star: number;
+}
+
 /** Inline styles for the DOM overlay (floating cash, per-block cost badges). */
 export interface PopupTheme {
   readonly cash: string;
@@ -148,6 +159,7 @@ export interface RenderTheme {
   readonly grass: number;
   readonly highlight: HighlightTheme;
   readonly particles: ParticleTheme;
+  readonly backdrop: BackdropTheme;
   readonly popups: PopupTheme;
   readonly miner: MinerTheme;
   /** Procedural "face" decals on special blocks and ore veins. */

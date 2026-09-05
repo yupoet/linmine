@@ -1,4 +1,5 @@
 import type { DirectionalLight, HemisphereLight, Object3D, PointLight, Scene } from 'three';
+import { Backdrop } from './backdrop.ts';
 import { BlockField } from './blocks.ts';
 import { Particles } from './fx.ts';
 import { HighlightField } from './highlights.ts';
@@ -20,6 +21,7 @@ export interface SkinResources {
   readonly highlights: HighlightField;
   readonly miner: Miner;
   readonly particles: Particles;
+  readonly backdrop: Backdrop;
 }
 
 export interface SceneLights {
@@ -35,12 +37,14 @@ export function buildSkin(theme: RenderTheme, gridWidth: number, character: Char
     highlights: new HighlightField(theme),
     miner: new Miner(theme, character),
     particles: new Particles(theme),
+    backdrop: new Backdrop(theme),
   };
 }
 
 /** Scene-graph nodes contributed by a skin, in draw order. */
 function nodes(skin: SkinResources): Object3D[] {
-  return [...skin.field.layers(), ...skin.particles.layers(), skin.highlights.mesh, skin.miner.group];
+  // Backdrop first: it sits at z < 0 and must draw before everything else.
+  return [skin.backdrop.group, ...skin.field.layers(), ...skin.particles.layers(), skin.highlights.mesh, skin.miner.group];
 }
 
 export function attachSkin(scene: Scene, skin: SkinResources): void {
@@ -54,6 +58,7 @@ export function releaseSkin(scene: Scene, skin: SkinResources): void {
   skin.highlights.dispose();
   skin.particles.dispose();
   skin.miner.dispose();
+  skin.backdrop.dispose();
 }
 
 /** Re-point the existing light objects at a different skin's rig. */

@@ -112,6 +112,9 @@ export const CANDY_THEME: RenderTheme = {
   grass: MINT,
   highlight: { affordable: SUN_LT, tooExpensive: CHERRY, hovered: CREAM_50, breathe: 0.35 },
   particles: { dust: TAN_300, hitFlash: CREAM_50 },
+  // Cream clouds drift by up top; pale-gold stars fade in as the evening
+  // lavender deepens (bible §5.1: the sky is part of the picture, not a void).
+  backdrop: { enabled: true, cloud: CREAM_50, star: SUN_LT },
   popups: {
     cash: '#fff8e7',
     gold: '#ffcc33',

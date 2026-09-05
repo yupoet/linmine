@@ -1,6 +1,6 @@
 # Lin Mine（林脉）交接文档
 
-日期：2026-09-05（傍晚更新：糖果皮肤上线 + 多角色系统）
+日期：2026-09-05（傍晚更新：糖果皮肤 + 多角色 + 背景层上线）
 状态：**已上线**，CI 自动部署
 线上地址：https://linmine.yupoet.com
 仓库：https://github.com/yupoet/linmine
@@ -36,6 +36,12 @@ R 流收尾时由 kimi 修掉的两个问题（合并前）：
 - 性能：girl 26 / boy 27 / robot 26 drawCalls vs ember 13（预算 +15 内）；单测钉死每角色网格 ≤15、壳 ≤8。
 - 验收：typecheck 干净，169/169 绿，sim 零漂移，ember/candy visual.mjs 零错误，三角色截图人工核对通过。
 
+### 0.4c 背景层（2026-09-05 傍晚，已上线）
+
+- candy 场景远景：`src/render/backdrop.ts`，一排奶油云朵缓慢横向漂移（横向图案平铺 + 取模回卷，无缝），随相机 0.85 视差跟随；深挖后淡金星星渐入（depthT 0.3→0.75 淡入）。整块背景只花 2 个 draw call（云合并网格 + 星 Points），总量 candy 28 = 预算上限（ember+15）。
+- 为腾预算，矿工的灯镜/天线球并入脸簇（同为无光顶点色材质），男孩 27→26。
+- ember 背景保持纯渐变（`backdrop.enabled=false`，像素对齐契约）；星星淡入有单测，深层傍晚截图未单独留档（deep 色已在 R 验收核对）。
+
 ### 0.5 待打磨（合入后）
 
 - 标题屏中部空旷：candy 下让渲染器在 `state === null` 时摆一个 Q 版矿工待机姿势，标题屏背景对该区域透明（需要在 `contracts.ts` 加一个 showcase 开关，属 app 层改动）。
@@ -58,7 +64,7 @@ Sonnet 做审计与写计划，Opus 写代码（各自 git worktree），codex/k
 npm install          # 依赖：three ^0.169、TS 5.6、Vite 5、Vitest 2、wrangler 4（dev）
 npm run dev          # 本地开发 http://localhost:5173
 npm run typecheck    # tsc --noEmit（strict，无未用变量）
-npm test             # 169 个测试，必须全绿
+npm test             # 173 个测试，必须全绿
 npm run build        # typecheck + vite build → dist/
 npm run sim          # 平衡模拟报告（scripts/sim.ts，可传参 runs/level pickaxeLevel）
 npm run deploy       # build + wrangler pages deploy（本地手动部署，一般不用——CI 自动）
@@ -120,7 +126,7 @@ render/ ui/ platform/  →  app/  →  core/ config/
 ## 5. 质量门禁（改代码必做）
 
 1. `npm run typecheck` 零错误
-2. `npm test` 全绿（当前 169）
+2. `npm test` 全绿（当前 173）
 3. `npm run sim` 胜率/金币与上一版对比无异常漂移
 4. `node scripts/visual.mjs` 零 console 错误
 5. push → CI 绿 → 线上抽查

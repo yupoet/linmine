@@ -73,17 +73,7 @@ export interface MinerParts {
  * line — so only the larger half of each pair (sleeve, thigh, pick head) is
  * outlined.
  */
-export const HULL_SKIP: readonly string[] = [
-  'lampLens',
-  'face',
-  'handL',
-  'handR',
-  'bootL',
-  'bootR',
-  'pickHandle',
-  'antenna',
-  'antennaBulb',
-];
+export const HULL_SKIP: readonly string[] = ['face', 'handL', 'handR', 'bootL', 'bootR', 'pickHandle', 'antenna'];
 
 const SKIP = new Set(HULL_SKIP);
 
@@ -221,6 +211,13 @@ class PartBuilder {
         { geometry: this.sphere(0.042, 10, 8), color: p.blush, at: [side * 0.12, 0.615, 0.13], scale: [1, 1, 0.45] },
       );
     }
+    // The glow bits (lamp lens, antenna bulb) share the face's flat
+    // vertex-tinted material, so they bake in here instead of owning a mesh.
+    if (recipe.headgear === 'helmet') {
+      face.push({ geometry: this.sphere(0.048, 10, 8), color: p.lampLens, at: [0, 0.74, 0.2] });
+    } else if (recipe.headgear === 'antenna') {
+      face.push({ geometry: this.sphere(0.045, 10, 8), color: p.lampLens, at: [0, 1.02, 0] });
+    }
     // The face is flat (unlit) and never outlined: no hull, so no cluster centre needed.
     parts.push(this.merged('face', 'body', face, [0, 0, 0], true));
 
@@ -271,13 +268,13 @@ class PartBuilder {
           ], [0, 0.74, 0]),
         ];
       case 'antenna':
-        // Thin detail stays unoutlined (it would blob); only the bulb glows.
+        // Thin detail stays unoutlined (it would blob); the glowing bulb is
+        // baked into the face cluster.
         return [
           this.merged('antenna', 'body', [
             { geometry: this.cylinder(0.16, 0.05), color: p.helmet, at: [0, 0.85, 0] },
             { geometry: this.cylinder(0.02, 0.14), color: p.brim, at: [0, 0.94, 0] },
           ], [0, 0.9, 0]),
-          this.flatPart('antennaBulb', 'body', this.sphere(0.045, 10, 8), p.lampLens, [0, 1.02, 0]),
         ];
       default:
         return [
@@ -287,7 +284,6 @@ class PartBuilder {
             { geometry: this.cylinder(0.188, 0.03), color: p.band, at: [0, 0.7, 0] },
             { geometry: this.cylinder(0.04, 0.05), color: p.lamp, at: [0, 0.74, 0.17] },
           ], [0, 0.72, 0]),
-          this.flatPart('lampLens', 'body', this.sphere(0.048, 10, 8), p.lampLens, [0, 0.74, 0.2]),
         ];
     }
   }

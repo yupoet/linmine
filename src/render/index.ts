@@ -111,6 +111,7 @@ class SceneRenderer implements RendererAPI {
 
   private minerX = 0;
   private minerY = 0;
+  private depthT = 0;
   private time = 0;
   private fps = 60;
   private lastDrawCalls = 0;
@@ -225,6 +226,10 @@ class SceneRenderer implements RendererAPI {
 
   private get particles() {
     return this.skin.particles;
+  }
+
+  private get backdrop() {
+    return this.skin.backdrop;
   }
 
   /**
@@ -345,6 +350,7 @@ class SceneRenderer implements RendererAPI {
     this.field.pulseGoal(this.time);
     if (this.state) this.field.sync(this.state.grid, Math.max(0, Math.round(this.minerRow)));
     this.updateCamera(step);
+    this.backdrop.update(step, this.camY, this.depthT);
     this.highlights.update(this.time);
     this.dom.update(step, this.project);
   }
@@ -804,6 +810,7 @@ class SceneRenderer implements RendererAPI {
     const state = this.state;
     const row = state ? Math.max(0, this.minerRow) : 0;
     const t = applyAtmosphere(this.theme, row, this.fit.camDist, this.atmosphere);
+    this.depthT = t;
     const air = this.theme.atmosphere;
     this.dom.setVignette(air.vignetteBase + air.vignetteGain * t);
     // Overbright exit layer, boosted with depth so it still cuts through fog.
