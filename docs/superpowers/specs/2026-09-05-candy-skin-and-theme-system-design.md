@@ -75,27 +75,32 @@ export interface RenderTheme {
 - `themes/candy.ts` 按 STYLE_BIBLE §2/§4。
 - `config/blocks.ts` 的 `color/accent` 字段保留（ember 主题引用它们），注释改为"ember 皮肤基色"。
 
-### 2.6 `setTheme` 重建顺序（渲染器）
+### 2.6 `setTheme` 重建顺序（渲染器）—— 已按 codex 审阅修订
 
-1. 若 id 相同则返回。
-2. `dom.setPalette(theme.popups)`；`particles.setTheme(...)`（仅颜色，池不重建）。
-3. 销毁并重建 `BlockField`（含描边壳与贴花层）、`HighlightField`、`Miner`；重设三灯参数与雾/天空常量。
-4. 若 `state` 非空：`setState(state)`（重新铺方块）、`setTargets(targets)`、`setHover(hover)`。
-5. 正在播放的挖掘序列：`playing` 保持，矿工位置由序列下一帧重写；受击帧记录（`hitCell/hitSlot`）随 BlockField 重建自然清零。
-6. `onWave/onLand` 回调不受影响（由序列器而非资源持有）。
+`setTheme(id)` 只记录 `pendingTheme`；真正重建在 `update(dt)` 开头、且 `playing === false` 时执行（挖掘序列中途重建会丢失已从 grid 移除但尚未播完的方块）。**不要**用 `setState` 触发重铺——它会 snap 相机。
+
+1. id 相同则清空 pending 返回。
+2. 保留：`state / targets / hover / 矿工位置与朝向 / 相机位置 / time / qualityScale`。
+3. 清空粒子、震屏、DOM 弹出层；从场景移除旧的 BlockField（主网格 + 描边壳 + 贴花层**一起** dispose，三者共享 `instanceMatrix`，r169 dispose 无引用计数）、HighlightField、Miner、粒子池。
+4. 用新主题构造 BlockField / HighlightField / Miner / Particles；更新现有灯对象参数（不新建灯），头灯按主题挂回矿工或替换为光晕。
+5. 新 field `reset()`；清 `hitPending*`；`updateAtmosphere()`、`field.sync(state)`、`pulseGoal()`。
+6. 恢复矿工可见性/位置/朝向；`highlights.set(gridWidth, targets, hover)`；`setReducedMotion` 现值重放。
+7. `onWave/onLand` 回调由序列器持有，不受影响。
 
 ### 2.7 方块视觉技术（candy）
 
 - **着色**：`MeshToonMaterial` + 3 级 `gradientMap`（DataTexture，NearestFilter），保留 `instanceColor`（three r169 的 toon 材质支持实例颜色）。三段色中的 shade/light 通过 toon 分段自然产生；`blocks.base` 作为实例色。
-- **描边**：第二个 `InstancedMesh`（同一 `RoundedBoxGeometry`，`MeshBasicMaterial({color: outline, side: BackSide})`），`scale ×1.045`。与主网格**共享同一个 `instanceMatrix` InstancedBufferAttribute 对象**（构造后 `hull.instanceMatrix = field.mesh.instanceMatrix`），每帧只同步 `count` 与 `needsUpdate`。绘制调用 +1。
-- **圆角**：`RoundedBoxGeometry(1,1,1, segments 3, radius 0.16)`（ember 保持 2/0.09）。
+- **着色补充**：gradientMap 只做明度分段（取 R 通道），三段色的 shade/light 由分段自然产生，实例色 = `blocks.base`。candy 灯光：去掉头灯对方块的贡献（头灯改光晕 sprite）、半球光天/地同色、太阳方向改为约 `(-3, 6, 1)`，使顶/正/侧三面落在不同色阶（现有 `(3,6,8)` 会让顶面与正面同阶）。
+- **描边**：第二个 `InstancedMesh`，几何为主几何的克隆并**沿法线外推 0.045**（不要用 `hull.scale`，object 缩放会同时缩放实例平移），`MeshBasicMaterial({color: outline, side: BackSide, fog: false, toneMapped: false})`，`renderOrder = 1`。与主网格**共享同一个 `instanceMatrix` InstancedBufferAttribute 对象**（`hull.instanceMatrix = field.mesh.instanceMatrix`）；`count` 与 `visible` **不会**跟随，须在 `add/removeAt/reset` 后镜像；`instanceColor` 留空。绘制调用 +1，顶点处理约 ×2。
+- **圆角**：`RoundedBoxGeometry(1,1,1, segments 3, radius 0.16)`（ember 保持 2/0.09）。segments 3 ≈ 588 三角/块，512 块 + 壳 ≈ 60 万三角；若低端机 FPS 不达标退回 segments 2（radius 不变）。不用 4。
 - **贴花（表情）**：一个额外 `InstancedMesh<PlaneGeometry, MeshBasicMaterial(alphaTest)>`，共享程序化 `CanvasTexture` 图集（每格 64px：炸药眼、钻头箭头 ×2 方向、补给十字笑脸、宝库金币、金/铜矿脉、出口星星），实例属性 `decalUv`（vec2 偏移）由 `onBeforeCompile` 注入。仅特殊方块 + 矿石有贴花；上限 `MAX_BLOCK_INSTANCES`。绘制调用 +1。
 - **高亮**：沿用 HighlightField，颜色换主题值；candy 增加 `sun-lt` 呼吸。
-- 若 codex/kimi 方案审阅中给出更优且同等成本的技术，可替换，但**绘制调用总增量 ≤ 3**、无新纹理文件。
+- **粒子（candy）**：圆角几何 + toon + 共享矩阵描边壳，+1 绘制；碎屑/尘土/受击闪光颜色全部来自主题对象（ember 公式原样保留）。
+- 绘制预算（candy 相对 ember）：实例化层 +3（方块壳、贴花、粒子壳），矿工 +11（微小网格）。无新纹理文件（图集为运行时 CanvasTexture，约 1 MiB 显存，无 mipmap）。
 
 ### 2.8 矿工（candy）
 
-`miner.ts` 拆为 `miner.ts`（骨架 + `update(dt)` 动画，不变）+ `minerParts.ts`（两套 `buildParts(theme)`：classic = 现有尺寸；chibi = 头 0.5、身 0.3、头身 1:0.9、球形眼白 + 瞳孔 + 高光、`blossom` 腮红、`sun` 圆顶安全帽 + `cherry` 帽带、放大镐头）。肩/髋枢轴 y 由部件返回，rig 读取，不再写死 0.52/0.24。candy 下全部部件合并为**一个** `BufferGeometry`（顶点色）+ 一个描边壳 → 矿工 2 次绘制（ember 保持 11）。
+`miner.ts` 拆为 `miner.ts`（骨架 + `update(dt)` 动画，不变）+ `minerParts.ts`（两套 `buildParts(theme)`：classic = 现有尺寸；chibi = 头 0.5、身 0.3、头身 1:0.9、球形眼白 + 瞳孔 + 高光、`blossom` 腮红、`sun` 圆顶安全帽 + `cherry` 帽带、放大镐头）。肩/髋枢轴 y 由部件返回，rig 读取，不再写死 0.52/0.24。**保留部件层级**（合并会冻结四肢），candy 每个部件用 `RoundedBoxGeometry` + `MeshToonMaterial`（按颜色共享材质），描边为该部件几何克隆缩放 ×1.09、`BackSide` 的子网格，随父级旋转/挤压；细部件（眼睛、镐柄）不加壳或减小外推（以 grok 审阅为准）。candy 矿工约 22 次绘制（ember 保持 11）；后续如需优化再按刚性枢轴合并（身体/双臂/双腿 ≈ 10 次）。
 
 ### 2.9 UI 主题（CSS）
 
@@ -125,7 +130,7 @@ export interface RenderTheme {
 2. `node scripts/visual.mjs`（新增 `THEME=candy|ember` 环境变量，脚本在启动前写 `linmine.theme`）两皮肤零 console 错误。
 3. ember：改前/改后同种子同操作序列截图逐像素 diff ≤ 0.5%（允许抗锯齿噪声）。
 4. candy：与 STYLE_BIBLE §7 DoD 逐条核对；外部模型（codex/kimi/grok）对照参考截图描述做盲审，我裁决。
-5. 性能：`?dev=1` 中位 FPS ≥ 改前 90%，drawCalls 增量 ≤ 3。
+5. 性能：`?dev=1` 中位 FPS ≥ 改前 90%；candy drawCalls 增量 ≤ 15（实例化层 ≤ 3 + 矿工壳）；ember drawCalls 与改前相同。
 
 ## 5. 风险
 
