@@ -15,7 +15,7 @@ no backend.
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm run test       # 161 unit + integration + balance tests
+npm run test       # 169 unit + integration + balance tests
 npm run typecheck
 npm run build      # -> dist/
 npm run sim        # balance report for every level (bot play)
@@ -25,8 +25,9 @@ Debug helpers: append `?dev=1` for a perf overlay and `?seed=12345` to force a
 run seed (useful with the replay codec in `src/devtools/replay.ts`).
 
 Two switchable skins (settings → 皮肤): **candy** (default, Happy-Mall-style
-toon look) and **ember** (the original look). Visual scripts take
-`THEME=candy|ember`.
+toon look) and **ember** (the original look). Three playable characters
+(settings → 角色): **little girl** (default), **miner boy**, **robot** — all in
+the candy look. Visual scripts take `THEME=candy|ember`.
 
 ## How it plays
 

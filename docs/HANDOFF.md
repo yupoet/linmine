@@ -1,6 +1,6 @@
 # Lin Mine（林脉）交接文档
 
-日期：2026-09-05（傍晚更新：糖果皮肤全流合入并上线）
+日期：2026-09-05（傍晚更新：糖果皮肤上线 + 多角色系统）
 状态：**已上线**，CI 自动部署
 线上地址：https://linmine.yupoet.com
 仓库：https://github.com/yupoet/linmine
@@ -28,6 +28,14 @@ R 流收尾时由 kimi 修掉的两个问题（合并前）：
 
 已知小缺口（不阻塞）：same-id `setTheme` 的 dispose-spy 测试未做（`SceneRenderer` 需 WebGL 上下文，vitest 里不可行，仅有纯 gate 函数测试 `theme-rebuild-gate.test.ts`）；WebGL1 回退下 candy 沿用 toon 灯光参数，未真机截图核对。
 
+### 0.4b 多角色系统（2026-09-05 傍晚，已上线）
+
+- 主角可切换：**小女孩（默认）/ 矿工小子 / 机器人**，全部 Q 版糖果画风；角色只重皮 candy 的 chibi 矿工，ember 永远用 classic（像素对齐）。
+- 数据：`config/characters.ts`（id 列表，`DEFAULT_CHARACTER='girl'`）→ 存档 **schema v3**（`settings.character`，v2→v3 迁移）→ 契约 `UIHandlers/RendererAPI.setCharacter` → 渲染层 `render/characters.ts` 的 `CharacterRecipe`（palette + headgear + skirt）→ `minerParts.chibi(recipe)` 按配方出头饰簇（头盔/双丸子头/天线）与裙摆。
+- `setCharacter` 复用 `setTheme` 的延迟重建（idle 帧才拆建，不碰 `setState`）；设置页新增"角色"行，i18n 词条已入词典。
+- 性能：girl 26 / boy 27 / robot 26 drawCalls vs ember 13（预算 +15 内）；单测钉死每角色网格 ≤15、壳 ≤8。
+- 验收：typecheck 干净，169/169 绿，sim 零漂移，ember/candy visual.mjs 零错误，三角色截图人工核对通过。
+
 ### 0.5 待打磨（合入后）
 
 - 标题屏中部空旷：candy 下让渲染器在 `state === null` 时摆一个 Q 版矿工待机姿势，标题屏背景对该区域透明（需要在 `contracts.ts` 加一个 showcase 开关，属 app 层改动）。
@@ -50,7 +58,7 @@ Sonnet 做审计与写计划，Opus 写代码（各自 git worktree），codex/k
 npm install          # 依赖：three ^0.169、TS 5.6、Vite 5、Vitest 2、wrangler 4（dev）
 npm run dev          # 本地开发 http://localhost:5173
 npm run typecheck    # tsc --noEmit（strict，无未用变量）
-npm test             # 161 个测试，必须全绿
+npm test             # 169 个测试，必须全绿
 npm run build        # typecheck + vite build → dist/
 npm run sim          # 平衡模拟报告（scripts/sim.ts，可传参 runs/level pickaxeLevel）
 npm run deploy       # build + wrangler pages deploy（本地手动部署，一般不用——CI 自动）
@@ -112,7 +120,7 @@ render/ ui/ platform/  →  app/  →  core/ config/
 ## 5. 质量门禁（改代码必做）
 
 1. `npm run typecheck` 零错误
-2. `npm test` 全绿（当前 161）
+2. `npm test` 全绿（当前 169）
 3. `npm run sim` 胜率/金币与上一版对比无异常漂移
 4. `node scripts/visual.mjs` 零 console 错误
 5. push → CI 绿 → 线上抽查
