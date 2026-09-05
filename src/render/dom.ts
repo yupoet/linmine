@@ -2,6 +2,7 @@ import { Vector3 } from 'three';
 import type { TargetInfo } from '../core/run.ts';
 import { CUBE_SIZE, MAX_LABELS, MAX_POPUPS, worldX, worldY } from './constants.ts';
 import { popupAlpha } from './fx.ts';
+import type { RenderTheme } from './themes/types.ts';
 
 /** Projects a world point to viewport pixels. Provided by the renderer. */
 export type Projector = (x: number, y: number, z: number, out: Vector3) => Vector3;
@@ -29,11 +30,6 @@ interface Label {
 }
 
 const POPUP_LIFE = 0.9;
-const POPUP_COLORS: Record<PopupTone, string> = {
-  cash: '#eafff2',
-  gold: '#ffd856',
-  repair: '#8ef0a4',
-};
 
 /**
  * DOM layer sitting over the canvas: floating cash numbers, per-block
@@ -50,13 +46,19 @@ export class DomLayer {
   private readonly popups: Popup[] = [];
   private readonly labels: Label[] = [];
   private readonly point = new Vector3();
+  private readonly popupColors: Record<PopupTone, string>;
+  private labelOk: string;
+  private labelNo: string;
   private left = 0;
   private top = 0;
   private vignetteAmount = -1;
   private cursor = 0;
   private labelsHidden = false;
 
-  constructor() {
+  constructor(theme: RenderTheme) {
+    this.popupColors = { cash: theme.popups.cash, gold: theme.popups.gold, repair: theme.popups.repair };
+    this.labelOk = theme.popups.labelOk;
+    this.labelNo = theme.popups.labelNo;
     this.root = document.createElement('div');
     this.root.style.cssText =
       'position:fixed;left:0;top:0;width:0;height:0;pointer-events:none;overflow:hidden;z-index:5;';
@@ -67,8 +69,22 @@ export class DomLayer {
       'background:radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 42%, rgba(0,0,0,0.85) 100%);';
     this.root.appendChild(this.vignette);
 
-    for (let i = 0; i < MAX_POPUPS; i++) this.popups.push(this.makePopup());
-    for (let i = 0; i < MAX_LABELS; i++) this.labels.push(this.makeLabel());
+    for (let i = 0; i < MAX_POPUPS; i++) this.popups.push(this.makePopup(theme.popups.shadow));
+    for (let i = 0; i < MAX_LABELS; i++) this.labels.push(this.makeLabel(theme.popups.labelShadow));
+  }
+
+  /**
+   * Re-skin the pooled elements in place. Cheaper and less disruptive than
+   * rebuilding the layer, and the pool identity stays stable for `clear()`.
+   */
+  setTheme(theme: RenderTheme): void {
+    this.popupColors.cash = theme.popups.cash;
+    this.popupColors.gold = theme.popups.gold;
+    this.popupColors.repair = theme.popups.repair;
+    this.labelOk = theme.popups.labelOk;
+    this.labelNo = theme.popups.labelNo;
+    for (const popup of this.popups) popup.el.style.textShadow = theme.popups.shadow;
+    for (const label of this.labels) label.el.style.textShadow = theme.popups.labelShadow;
   }
 
   attach(parent: HTMLElement): void {
@@ -108,7 +124,7 @@ export class DomLayer {
     popup.duration = POPUP_LIFE;
     popup.active = true;
     popup.el.textContent = text;
-    popup.el.style.color = POPUP_COLORS[tone];
+    popup.el.style.color = this.popupColors[tone];
     popup.el.style.display = 'block';
   }
 
@@ -125,7 +141,7 @@ export class DomLayer {
       label.lastX = Number.NaN;
       label.lastY = Number.NaN;
       label.el.textContent = `${target.cost}`;
-      label.el.style.color = target.affordable ? '#f2fff8' : '#ff8b76';
+      label.el.style.color = target.affordable ? this.labelOk : this.labelNo;
       label.el.style.display = 'block';
     }
     for (let i = index; i < this.labels.length; i++) {
@@ -192,20 +208,20 @@ export class DomLayer {
     this.root.remove();
   }
 
-  private makePopup(): Popup {
+  private makePopup(shadow: string): Popup {
     const el = document.createElement('div');
     el.style.cssText =
       'position:absolute;left:0;top:0;display:none;font:700 15px/1 system-ui,sans-serif;' +
-      'text-shadow:0 1px 2px rgba(0,0,0,0.9);white-space:nowrap;will-change:transform,opacity;';
+      `text-shadow:${shadow};white-space:nowrap;will-change:transform,opacity;`;
     this.root.appendChild(el);
     return { el, x: 0, y: 0, z: 0, t: 0, duration: POPUP_LIFE, active: false };
   }
 
-  private makeLabel(): Label {
+  private makeLabel(shadow: string): Label {
     const el = document.createElement('div');
     el.style.cssText =
       'position:absolute;left:0;top:0;display:none;font:800 11px/1 system-ui,sans-serif;' +
-      'text-shadow:0 1px 2px rgba(0,0,0,0.95);white-space:nowrap;will-change:transform;';
+      `text-shadow:${shadow};white-space:nowrap;will-change:transform;`;
     this.root.appendChild(el);
     return { el, x: 0, y: 0, z: 0, active: false, lastX: Number.NaN, lastY: Number.NaN };
   }

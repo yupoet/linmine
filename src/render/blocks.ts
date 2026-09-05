@@ -1,22 +1,10 @@
-import {
-  AdditiveBlending,
-  BackSide,
-  BoxGeometry,
-  Color,
-  InstancedMesh,
-  Matrix4,
-  MeshBasicMaterial,
-  MeshStandardMaterial,
-} from 'three';
+import { Color, InstancedMesh, Matrix4, type Object3D } from 'three';
 import { BlockKind, BLOCKS } from '../config/blocks.ts';
 import { MAX_ROWS } from '../config/version.ts';
 import type { Grid } from '../core/grid.ts';
-import type { TargetInfo } from '../core/run.ts';
-import type { Cell } from '../core/types.ts';
 import {
   CUBE_SIZE,
   MAX_BLOCK_INSTANCES,
-  MAX_HIGHLIGHT_INSTANCES,
   cellHash,
   worldX,
   worldY,
@@ -24,12 +12,9 @@ import {
   WINDOW_BELOW,
 } from './constants.ts';
 import { RoundedBoxGeometry } from './roundedBox.ts';
-
-const GRASS = 0x6aa84f;
-const GOAL_COLOR = BLOCKS[BlockKind.Exit].color;
-const GOAL_ACCENT = BLOCKS[BlockKind.Exit].accent;
-
-const EMPTY_TARGETS: readonly TargetInfo[] = [];
+import { createBlockMaterial, createOutlineHull, type LitMaterial, type OutlineHull } from './blockHull.ts';
+import { DecalLayer } from './decals.ts';
+import type { RenderTheme } from './themes/types.ts';
 
 /**
  * Every visible block in one instanced draw call.
@@ -47,9 +32,16 @@ const EMPTY_TARGETS: readonly TargetInfo[] = [];
  * rules layer before the renderer has played the swing).
  */
 export class BlockField {
-  readonly mesh: InstancedMesh<RoundedBoxGeometry, MeshStandardMaterial>;
+  readonly mesh: InstancedMesh<RoundedBoxGeometry, LitMaterial>;
+  /** Candy's back-faced outline shell; null on skins without outlines. */
+  readonly hull: InstancedMesh | null = null;
+  /** Candy's decal plane (block "faces" and ore veins); null otherwise. */
+  readonly decals: InstancedMesh | null = null;
+  private readonly outline: OutlineHull | null = null;
+  private readonly decalLayer: DecalLayer | null = null;
+  private readonly theme: RenderTheme;
   private readonly geometry: RoundedBoxGeometry;
-  private readonly material: MeshStandardMaterial;
+  private readonly material: LitMaterial;
   private readonly capacity: number;
   private readonly slotOfCell = new Map<number, number>();
   private readonly cellOfSlot: Int32Array;
@@ -66,11 +58,13 @@ export class BlockField {
   private goalRow = -1;
   private goalBoost = 1;
 
-  constructor(width: number) {
+  constructor(width: number, theme: RenderTheme) {
     this.width = width;
+    this.theme = theme;
     this.capacity = Math.min(MAX_BLOCK_INSTANCES, (WINDOW_ABOVE + WINDOW_BELOW + 2) * Math.max(width, 8));
-    this.geometry = new RoundedBoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE, 2, 0.09);
-    this.material = new MeshStandardMaterial({ roughness: 0.72, metalness: 0.04 });
+    const { segments, radius } = theme.geometry;
+    this.geometry = new RoundedBoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE, segments, radius);
+    this.material = createBlockMaterial(theme);
     this.mesh = new InstancedMesh(this.geometry, this.material, this.capacity);
     this.mesh.count = 0;
     // Instances are placed by hand every time; the auto bounding sphere would
@@ -79,10 +73,57 @@ export class BlockField {
     this.cellOfSlot = new Int32Array(this.capacity).fill(-1);
     this.kindOfSlot = new Uint8Array(this.capacity);
     this.variantOfSlot = new Uint8Array(this.capacity);
+
+    if (theme.outline.enabled) {
+      this.outline = createOutlineHull(this.mesh, this.geometry, theme, this.capacity);
+      this.hull = this.outline.mesh;
+    }
+    if (theme.decals) {
+      this.decalLayer = new DecalLayer(this.capacity, this.mesh.instanceMatrix);
+      this.decals = this.decalLayer.mesh;
+    }
   }
 
   get count(): number {
     return this.mesh.count;
+  }
+
+  /** Every object this field contributes to the scene graph. */
+  layers(): Object3D[] {
+    const out: Object3D[] = [this.mesh];
+    if (this.hull) out.push(this.hull);
+    if (this.decals) out.push(this.decals);
+    return out;
+  }
+
+  /** Instance slot holding a cell, or -1. Exposed for the outline tests. */
+  slotOf(cellIndex: number): number {
+    return this.slotOfCell.get(cellIndex) ?? -1;
+  }
+
+  /** Cell currently drawn in a slot, or -1. */
+  cellOf(slot: number): number {
+    return slot >= 0 && slot < this.mesh.count ? this.cellOfSlot[slot] : -1;
+  }
+
+  decalRectAt(slot: number): [number, number, number, number] {
+    return this.decalLayer ? this.decalLayer.rectAt(slot) : [0, 0, 0, 0];
+  }
+
+  /**
+   * Push the live instance count (and visibility) onto the shells. three.js
+   * shares the matrix attribute but not these, so every add / remove / reset
+   * has to mirror them or the outline and decals drift out of sync with the
+   * blocks — the same discipline the hit-flash slot state follows.
+   */
+  private mirrorLayers(): void {
+    const count = this.mesh.count;
+    const visible = this.mesh.visible;
+    if (this.hull) {
+      this.hull.count = count;
+      this.hull.visible = visible;
+    }
+    this.decalLayer?.mirror(count, visible);
   }
 
   reset(width: number): void {
@@ -96,6 +137,7 @@ export class BlockField {
     this.dirty = true;
     this.hitCell = -1;
     this.hitSlot = -1;
+    this.mirrorLayers();
   }
 
   /** Keep a cell rendered even though the grid already reports it as empty. */
@@ -171,7 +213,7 @@ export class BlockField {
     const k = this.hitT / DURATION;
     const flash = 1 - k;
     // White flash layered over the base colour, plus a shrinking jitter.
-    this.color.copy(this.hitBaseColor).lerp(this.mix.setHex(0xffffff), flash * 0.7);
+    this.color.copy(this.hitBaseColor).lerp(this.mix.setHex(this.theme.particles.hitFlash), flash * 0.7);
     this.mesh.setColorAt(slot, this.color);
     const shake = reduced ? 0 : 0.06 * (1 - k);
     const jx = worldX(col, this.width) + (Math.sin(this.hitT * 260) * shake);
@@ -219,10 +261,21 @@ export class BlockField {
     if (touched && this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
   }
 
+  /**
+   * Blocks, outline shell and decals share one `instanceMatrix`, which r169
+   * frees without reference counting — so the three are always disposed
+   * together, never individually.
+   */
   dispose(): void {
     this.mesh.dispose();
     this.geometry.dispose();
     this.material.dispose();
+    if (this.outline) {
+      this.outline.mesh.dispose();
+      this.outline.geometry.dispose();
+      this.outline.material.dispose();
+    }
+    this.decalLayer?.dispose();
     this.slotOfCell.clear();
     this.pending.clear();
   }
@@ -264,6 +317,7 @@ export class BlockField {
     this.slotOfCell.set(cell, slot);
     this.mesh.count = slot + 1;
     this.writeInstance(slot);
+    this.mirrorLayers();
   }
 
   private removeAt(slot: number): void {
@@ -284,6 +338,7 @@ export class BlockField {
     }
     this.cellOfSlot[last] = -1;
     this.mesh.count = last;
+    this.mirrorLayers();
   }
 
   private writeInstance(slot: number): void {
@@ -293,134 +348,39 @@ export class BlockField {
     this.matrix.makeTranslation(worldX(col, this.width), worldY(row), 0);
     this.mesh.setMatrixAt(slot, this.matrix);
     this.mesh.setColorAt(slot, this.blockColor(col, row, this.kindOfSlot[slot], this.variantOfSlot[slot]));
+    // Per-slot decal state follows the same invalidation rule as the hit flash.
+    this.decalLayer?.setSlot(slot, this.kindOfSlot[slot], this.variantOfSlot[slot]);
     this.mesh.instanceMatrix.needsUpdate = true;
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
   }
 
+  /** Instance colour for a block: theme base, jittered, plus the accent pass. */
   private blockColor(col: number, row: number, kind: number, variant: number): Color {
     const def = BLOCKS[kind as BlockKind];
+    const palette = this.theme.blocks[kind as BlockKind];
     const jitter = cellHash(col, row);
-    this.color.setHex(def.color);
+    this.color.setHex(palette.base);
     // Jitter breaks up large flat areas of the same block.
     this.color.multiplyScalar(0.93 + jitter * 0.14);
 
     if (kind === BlockKind.Dirt && variant === 1) {
-      this.color.lerp(this.mix.setHex(GRASS), 0.55);
+      this.color.lerp(this.mix.setHex(this.theme.grass), 0.55);
     } else if (def.isOre) {
-      this.color.lerp(this.mix.setHex(def.accent), 0.14 + jitter * 0.2);
+      this.color.lerp(this.mix.setHex(palette.light), 0.14 + jitter * 0.2);
     } else if (kind === BlockKind.Arrow && variant === 1) {
       // Side-firing drill charges read differently from downward ones.
-      this.color.lerp(this.mix.setHex(def.accent), 0.45);
+      this.color.lerp(this.mix.setHex(palette.light), 0.45);
     }
     return this.color;
   }
 
   private goalColor(col: number, row: number, phase: number): Color {
+    const exit = this.theme.blocks[BlockKind.Exit];
     const jitter = cellHash(col, row);
-    this.color.setHex(GOAL_COLOR);
-    this.color.lerp(this.mix.setHex(GOAL_ACCENT), 0.3 + 0.4 * phase);
+    this.color.setHex(exit.base);
+    this.color.lerp(this.mix.setHex(exit.light), 0.3 + 0.4 * phase);
     // Overbright reads as a glow; the boost also fights the depth fog.
     this.color.multiplyScalar((0.92 + jitter * 0.14) * (1.15 + 0.45 * phase) * this.goalBoost);
     return this.color;
-  }
-}
-
-/**
- * Reachability affordance: one additive back-faced cube per target. Back faces
- * are behind the block, so depth testing leaves only a rim around the
- * silhouette — an outline that costs a single draw call.
- */
-export class HighlightField {
-  readonly mesh: InstancedMesh<BoxGeometry, MeshBasicMaterial>;
-  private readonly geometry: BoxGeometry;
-  private readonly material: MeshBasicMaterial;
-  private readonly capacity = MAX_HIGHLIGHT_INSTANCES;
-  private readonly matrix = new Matrix4();
-  private readonly color = new Color();
-  private readonly affordable = new Color(0x7cf0b4);
-  private readonly tooExpensive = new Color(0xff5a45);
-  private readonly hovered = new Color(0xfff3b0);
-  private targets: readonly TargetInfo[] = EMPTY_TARGETS;
-  private hover: Cell | null = null;
-  private width = 6;
-  private suppressed = false;
-  private dirty = true;
-
-  constructor() {
-    this.geometry = new BoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE);
-    this.material = new MeshBasicMaterial({
-      transparent: true,
-      opacity: 0.55,
-      side: BackSide,
-      blending: AdditiveBlending,
-      depthWrite: false,
-      fog: false,
-    });
-    this.mesh = new InstancedMesh(this.geometry, this.material, this.capacity);
-    this.mesh.count = 0;
-    this.mesh.frustumCulled = false;
-    this.mesh.renderOrder = 2;
-  }
-
-  get count(): number {
-    return this.mesh.count;
-  }
-
-  set(width: number, targets: readonly TargetInfo[], hover: Cell | null): void {
-    this.width = width;
-    this.targets = targets;
-    this.hover = hover;
-    this.dirty = true;
-  }
-
-  /** Hidden while a dig plays so rims never float over destroyed blocks. */
-  setSuppressed(value: boolean): void {
-    if (this.suppressed === value) return;
-    this.suppressed = value;
-    this.dirty = true;
-  }
-
-  clear(): void {
-    this.targets = EMPTY_TARGETS;
-    this.hover = null;
-    this.mesh.count = 0;
-    this.dirty = true;
-  }
-
-  update(time: number): void {
-    if (!this.dirty && this.mesh.count === 0) return;
-    this.dirty = false;
-
-    if (this.suppressed) {
-      this.mesh.count = 0;
-      return;
-    }
-
-    const pulse = 0.5 + 0.5 * Math.sin(time * 4.6);
-    this.material.opacity = 0.4 + 0.22 * pulse;
-    let slot = 0;
-    for (let i = 0; i < this.targets.length && slot < this.capacity; i++) {
-      const target = this.targets[i];
-      const isHover = this.hover !== null && this.hover.col === target.col && this.hover.row === target.row;
-      const scale = isHover ? 1.24 + 0.04 * pulse : 1.12;
-      this.matrix.makeScale(scale, scale, scale);
-      this.matrix.setPosition(worldX(target.col, this.width), worldY(target.row), 0);
-      this.mesh.setMatrixAt(slot, this.matrix);
-
-      this.color.copy(target.affordable ? this.affordable : this.tooExpensive);
-      if (isHover) this.color.lerp(this.hovered, 0.55);
-      this.mesh.setColorAt(slot, this.color);
-      slot++;
-    }
-    this.mesh.count = slot;
-    this.mesh.instanceMatrix.needsUpdate = true;
-    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
-  }
-
-  dispose(): void {
-    this.mesh.dispose();
-    this.geometry.dispose();
-    this.material.dispose();
-    this.targets = EMPTY_TARGETS;
   }
 }

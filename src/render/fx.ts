@@ -1,16 +1,23 @@
 import {
   BoxGeometry,
+  type BufferGeometry,
   Color,
   DynamicDrawUsage,
   Euler,
   type InstancedBufferAttribute,
   InstancedMesh,
+  type Material,
   Matrix4,
   MeshBasicMaterial,
+  MeshToonMaterial,
+  type Object3D,
   Quaternion,
   Vector3,
 } from 'three';
+import { createOutlineHull, toonGradient, type OutlineHull } from './blockHull.ts';
 import { MAX_PARTICLES, MAX_SHAKE, PARTICLE_GRAVITY, clamp01 } from './constants.ts';
+import { RoundedBoxGeometry } from './roundedBox.ts';
+import type { RenderTheme } from './themes/types.ts';
 
 /**
  * Pooled debris cubes. Live particles always occupy slots [0, live) so the
@@ -21,9 +28,12 @@ import { MAX_PARTICLES, MAX_SHAKE, PARTICLE_GRAVITY, clamp01 } from './constants
  * by shrinking instead.
  */
 export class Particles {
-  readonly mesh: InstancedMesh<BoxGeometry, MeshBasicMaterial>;
-  private readonly geometry: BoxGeometry;
-  private readonly material: MeshBasicMaterial;
+  readonly mesh: InstancedMesh<BufferGeometry, Material>;
+  /** Candy's outline shell, sharing the pool's `instanceMatrix`. */
+  readonly hull: InstancedMesh | null = null;
+  private readonly outline: OutlineHull | null = null;
+  private readonly geometry: BufferGeometry;
+  private readonly material: Material;
   private readonly px = new Float32Array(MAX_PARTICLES);
   private readonly py = new Float32Array(MAX_PARTICLES);
   private readonly pz = new Float32Array(MAX_PARTICLES);
@@ -44,21 +54,47 @@ export class Particles {
   private readonly position = new Vector3();
   private readonly scale = new Vector3();
   private readonly color = new Color();
+  private readonly dustColor: number;
   private live = 0;
   private reduced = false;
 
-  constructor() {
-    this.geometry = new BoxGeometry(1, 1, 1);
-    this.material = new MeshBasicMaterial();
+  constructor(theme: RenderTheme) {
+    this.dustColor = theme.particles.dust;
+    // Candy throws plump rounded chunks that inherit the block's shade tone;
+    // ember keeps the flat unlit cubes it always had.
+    const toon = theme.shading === 'toon';
+    this.geometry = toon ? new RoundedBoxGeometry(1, 1, 1, 1, 0.3) : new BoxGeometry(1, 1, 1);
+    this.material = toon ? new MeshToonMaterial({ gradientMap: toonGradient() }) : new MeshBasicMaterial();
     this.mesh = new InstancedMesh(this.geometry, this.material, MAX_PARTICLES);
     this.mesh.count = 0;
     this.mesh.frustumCulled = false;
     this.mesh.instanceMatrix.setUsage(DynamicDrawUsage);
     this.mesh.visible = false;
+
+    if (theme.outline.enabled) {
+      this.outline = createOutlineHull(this.mesh, this.geometry, theme, MAX_PARTICLES);
+      this.hull = this.outline.mesh;
+      this.hull.visible = false;
+    }
   }
 
   get count(): number {
     return this.live;
+  }
+
+  /** Scene-graph nodes this pool contributes. */
+  layers(): Object3D[] {
+    return this.hull ? [this.mesh, this.hull] : [this.mesh];
+  }
+
+  /**
+   * The shell shares `instanceMatrix` but not `count`/`visible`, so every path
+   * that changes the live population has to push them across by hand.
+   */
+  private mirrorHull(): void {
+    if (!this.hull) return;
+    this.hull.count = this.mesh.count;
+    this.hull.visible = this.mesh.visible;
   }
 
   setReducedMotion(value: boolean): void {
@@ -69,6 +105,7 @@ export class Particles {
     this.live = 0;
     this.mesh.count = 0;
     this.mesh.visible = false;
+    this.mirrorHull();
   }
 
   /** Debris burst tinted with the destroyed block's colour. */
@@ -98,7 +135,7 @@ export class Particles {
 
   /** Low, wide puff used when the miner lands. */
   dust(x: number, y: number, z: number, strength: number): void {
-    this.color.setHex(0xb9a888);
+    this.color.setHex(this.dustColor);
     this.burst(x, y, z, this.color, Math.round(4 + strength * 6), 1.4 + strength, 0.1);
   }
 
@@ -132,6 +169,7 @@ export class Particles {
 
     this.mesh.count = this.live;
     this.mesh.visible = this.live > 0;
+    this.mirrorHull();
     if (this.live > 0) {
       this.mesh.instanceMatrix.needsUpdate = true;
       const colors: InstancedBufferAttribute | null = this.mesh.instanceColor;
@@ -139,10 +177,16 @@ export class Particles {
     }
   }
 
+  /** Pool and shell share one `instanceMatrix`; they are freed together. */
   dispose(): void {
     this.mesh.dispose();
     this.geometry.dispose();
     this.material.dispose();
+    if (this.outline) {
+      this.outline.mesh.dispose();
+      this.outline.geometry.dispose();
+      this.outline.material.dispose();
+    }
     this.live = 0;
   }
 
