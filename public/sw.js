@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 /* eslint-disable no-restricted-globals */
 
-const CACHE = 'linmine-shell-v1';
+const CACHE = 'linmine-shell-v2'; // v2: themed boot shell + candy icons
 const SHELL_PATHS = ['./', './index.html', './manifest.webmanifest', './favicon.svg'];
 
 declare const self: ServiceWorkerGlobalScope;
