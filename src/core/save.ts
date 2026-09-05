@@ -10,6 +10,7 @@
 import { PICKAXE_MAX_LEVEL, type ChestTier } from '../config/economy.ts';
 import { CARDS } from '../config/cards.ts';
 import { LEVELS } from '../config/levels.ts';
+import { DEFAULT_THEME, isThemeId, type ThemeId } from '../config/theme.ts';
 import { CONFIG_VERSION, SAVE_SCHEMA_VERSION } from '../config/version.ts';
 
 export interface CardOwnership {
@@ -30,6 +31,8 @@ export interface ProfileSettings {
   haptics: boolean;
   /** UI language. Chinese is the default; English is opt-in. */
   lang: 'zh' | 'en';
+  /** Visual skin. Candy is the default; ember is the legacy look. */
+  theme: ThemeId;
 }
 
 export interface LifetimeStats {
@@ -65,7 +68,7 @@ export function createProfile(): Profile {
     cards: {},
     levels: Object.fromEntries(LEVELS.map((level) => [level.id, emptyLevelRecord()])),
     pendingChests: [],
-    settings: { muted: false, reducedMotion: false, haptics: true, lang: 'zh' },
+    settings: { muted: false, reducedMotion: false, haptics: true, lang: 'zh', theme: DEFAULT_THEME },
     tutorialDone: false,
     stats: { runs: 0, wins: 0, deepestRow: 0, blocksMined: 0, chestsOpened: 0 },
     updatedAt: 0,
@@ -156,6 +159,7 @@ export function sanitizeProfile(raw: unknown): Profile {
       reducedMotion: bool(raw.settings.reducedMotion, false),
       haptics: bool(raw.settings.haptics, true),
       lang: raw.settings.lang === 'en' ? 'en' : 'zh',
+      theme: isThemeId(raw.settings.theme) ? raw.settings.theme : DEFAULT_THEME,
     };
   }
 
@@ -186,6 +190,17 @@ export function migrateProfile(raw: unknown): Profile {
   // sanitizer is what actually repairs pre-release saves.
   if (version < 1) {
     current = { ...current, schemaVersion: 1 };
+  }
+
+  // v1 -> v2: skins arrive. Saves written before the theme picker have no
+  // `settings.theme`; give them the default so the sanitizer keeps it.
+  if (version < 2) {
+    const settings = isRecord(current.settings) ? current.settings : {};
+    current = {
+      ...current,
+      schemaVersion: 2,
+      settings: { ...settings, theme: isThemeId(settings.theme) ? settings.theme : DEFAULT_THEME },
+    };
   }
 
   const profile = sanitizeProfile(current);

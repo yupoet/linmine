@@ -18,8 +18,24 @@ const errors = [];
 page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
 
+// Skin under test: written before navigation so index.html's boot script picks
+// it up on the very first paint. Defaults to candy, like the game itself.
+const THEME = process.env.THEME === 'ember' ? 'ember' : 'candy';
+await page.addInitScript((theme) => {
+  try { localStorage.setItem('linmine.theme', theme); } catch (err) { /* private mode */ }
+}, THEME);
+console.log('theme:', THEME);
+
 await page.goto(URL, { waitUntil: 'networkidle' });
 await sleep(800);
+
+// The mirror key only drives the first paint; the loaded profile is the real
+// source of truth, so push the skin through the app once the handle exists.
+await page.evaluate((theme) => {
+  window.linmine.game.handlers.setTheme(theme);
+  window.linmine.game.handlers.goToTitle();
+}, THEME);
+await sleep(300);
 
 // Default should be Chinese.
 const titleZh = await page.evaluate(() => document.title);

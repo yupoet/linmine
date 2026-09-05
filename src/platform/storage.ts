@@ -6,12 +6,19 @@
  *   fresh profile, and reports which happened so the UI can warn the player;
  * - works when localStorage is unavailable (private mode) by degrading to an
  *   in-memory store for the session.
+ *
+ * Besides the envelope every save mirrors the chosen theme as plain text so
+ * the boot script in index.html can paint the right skin before any module
+ * loads. The mirror is never read back here and never checksummed.
  */
 
 import { migrateProfile, serializeProfile, type Profile } from '../core/save.ts';
 
 const STORAGE_KEY = 'linmine.save';
 const BACKUP_KEY = 'linmine.save.bak';
+
+/** Plain-text theme mirror; also duplicated in index.html's boot script. */
+export const THEME_MIRROR_KEY = 'linmine.theme';
 
 export type LoadStatus = 'fresh' | 'loaded' | 'recovered' | 'corrupt';
 
@@ -51,7 +58,7 @@ function unwrap(raw: string | null): Profile | null {
   }
 }
 
-interface KeyValueStore {
+export interface KeyValueStore {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
@@ -86,13 +93,15 @@ export interface StorageAPI {
   persistent: boolean;
 }
 
-export function createStorage(): StorageAPI {
-  const storeRef: { current: KeyValueStore } = { current: createMemoryStore() };
+/**
+ * @param injected test seam: an explicit store replaces detection entirely.
+ */
+export function createStorage(injected?: KeyValueStore): StorageAPI {
+  const storeRef: { current: KeyValueStore } = { current: injected ?? createMemoryStore() };
   let persistent = false;
   try {
-    const detected = detectStore();
-    storeRef.current = detected;
-    persistent = detected !== createMemoryStore() && typeof localStorage !== 'undefined' && detected === localStorage;
+    if (!injected) storeRef.current = detectStore();
+    persistent = typeof localStorage !== 'undefined' && storeRef.current === localStorage;
   } catch {
     persistent = false;
   }
@@ -130,6 +139,8 @@ export function createStorage(): StorageAPI {
       const previous = read(STORAGE_KEY);
       if (previous) write(BACKUP_KEY, previous);
       write(STORAGE_KEY, wrap(profile));
+      // Best effort, outside the checksum: the boot script only needs a hint.
+      write(THEME_MIRROR_KEY, profile.settings.theme);
     },
     clear(): void {
       try {

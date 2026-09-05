@@ -13,6 +13,7 @@ import {
   WebGLRenderer,
 } from 'three';
 import type { RendererAPI, RendererOptions } from '../app/contracts.ts';
+import { DEFAULT_THEME, type ThemeId } from '../config/theme.ts';
 import { BlockKind, BLOCKS } from '../config/blocks.ts';
 import type { TargetInfo } from '../core/run.ts';
 import type { Cell, DigResult, Removal, RunState } from '../core/types.ts';
@@ -95,6 +96,7 @@ class SceneRenderer implements RendererAPI {
   private hover: Cell | null = null;
   private gridWidth: number;
   private reducedMotion = false;
+  private theme: ThemeId = DEFAULT_THEME;
   private contextLost = false;
 
   private camDist = 15;
@@ -373,6 +375,15 @@ class SceneRenderer implements RendererAPI {
     this.reducedMotion = value;
     this.particles.setReducedMotion(value);
     if (value) this.shake.reset();
+  }
+
+  /**
+   * Placeholder: the skin id is recorded but nothing is rebuilt yet. The
+   * render skin (themes/*, toon materials, chibi miner) lands separately.
+   */
+  setTheme(theme: ThemeId): void {
+    if (theme === this.theme) return;
+    this.theme = theme;
   }
 
   isBusy(): boolean {

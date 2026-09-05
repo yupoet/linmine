@@ -244,6 +244,9 @@ const zh: Record<string, string> = {
   Haptics: '震动反馈',
   'Buzz on big chains.': '大连锁时嗡嗡作响。',
   Language: '语言',
+  Skin: '皮肤',
+  Candy: '糖果',
+  Ember: '余烬',
   'Reset save': '重置存档',
   'Tap again to erase': '再点一次确认清除',
   'Erasing your save removes cash, cards and level progress.':

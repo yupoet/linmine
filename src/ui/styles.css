@@ -1896,7 +1896,10 @@
 }
 
 /* --- language switcher ------------------------------------------------------ */
-.settings__lang {
+/* The skin row reuses the language row's shape verbatim for now; the UI skin
+   stream restyles both. */
+.settings__lang,
+.settings__skin {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1906,11 +1909,13 @@
   background: rgba(255, 255, 255, 0.05);
   margin-bottom: 0.75rem;
 }
-.langbtns {
+.langbtns,
+.skinbtns {
   display: flex;
   gap: 0.4rem;
 }
-.langbtn {
+.langbtn,
+.skinbtn {
   font: inherit;
   font-size: 0.9rem;
   padding: 0.42rem 0.9rem;
@@ -1921,7 +1926,8 @@
   cursor: pointer;
   transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
 }
-.langbtn.is-on {
+.langbtn.is-on,
+.skinbtn.is-on {
   background: linear-gradient(180deg, #ffd977, #f0a942);
   border-color: #f0a942;
   color: #40270c;
