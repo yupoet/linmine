@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Miner } from '../../src/render/miner.ts';
+import { CHARACTER_IDS } from '../../src/config/characters.ts';
 import { buildParts, HULL_SKIP } from '../../src/render/minerParts.ts';
 import { CANDY_THEME } from '../../src/render/themes/candy.ts';
 import { EMBER_THEME } from '../../src/render/themes/ember.ts';
@@ -37,29 +38,50 @@ describe('buildParts', () => {
   });
 
   it('outlines the big chibi parts but never the fine detail', () => {
-    const parts = buildParts('chibi', CANDY_THEME);
-    const byName = new Map(parts.parts.map((part) => [part.name, part]));
+    for (const character of CHARACTER_IDS) {
+      const parts = buildParts('chibi', CANDY_THEME, character);
+      const byName = new Map(parts.parts.map((part) => [part.name, part]));
 
-    for (const name of HULL_SKIP) {
-      const part = byName.get(name);
-      expect(part, `missing part ${name}`).toBeDefined();
-      expect(part!.hull, `${name} must not carry an outline shell`).toBeNull();
-    }
+      // HULL_SKIP is the union over every character's fine detail; a recipe
+      // only contains its own (the boy has a lamp lens, the robot an antenna).
+      for (const name of HULL_SKIP) {
+        const part = byName.get(name);
+        if (!part) continue;
+        expect(part.hull, `${character}/${name} must not carry an outline shell`).toBeNull();
+      }
 
-    for (const name of ['head', 'torsoHips', 'helmet', 'sleeveL', 'thighL', 'pickHead']) {
-      const part = byName.get(name);
-      expect(part, `missing part ${name}`).toBeDefined();
-      expect(part!.hull, `${name} should carry an outline shell`).not.toBeNull();
+      for (const name of ['head', 'torsoHips', 'sleeveL', 'thighL', 'pickHead']) {
+        const part = byName.get(name);
+        expect(part, `${character}: missing part ${name}`).toBeDefined();
+        expect(part!.hull, `${character}/${name} should carry an outline shell`).not.toBeNull();
+      }
+      parts.dispose();
     }
-    parts.dispose();
   });
 
-  it('keeps the chibi miner inside the draw-call budget (scene must stay ≤ ember + 15)', () => {
-    const parts = buildParts('chibi', CANDY_THEME);
-    const hulls = parts.parts.filter((part) => part.hull !== null).length;
-    expect(parts.parts.length).toBeLessThanOrEqual(15);
-    expect(hulls).toBeLessThanOrEqual(8);
-    parts.dispose();
+  it('outlines the girl\'s hair like a helmet but never the robot\'s antenna', () => {
+    const girl = buildParts('chibi', CANDY_THEME, 'girl');
+    const hair = girl.parts.find((part) => part.name === 'hair');
+    expect(hair, 'girl should wear twin buns').toBeDefined();
+    expect(hair!.hull).not.toBeNull();
+    expect(girl.parts.some((part) => part.name === 'helmet')).toBe(false);
+    girl.dispose();
+
+    const robot = buildParts('chibi', CANDY_THEME, 'robot');
+    const antenna = robot.parts.find((part) => part.name === 'antenna');
+    expect(antenna, 'robot should wear an antenna').toBeDefined();
+    expect(antenna!.hull).toBeNull();
+    robot.dispose();
+  });
+
+  it('keeps every character inside the draw-call budget (scene must stay ≤ ember + 15)', () => {
+    for (const character of CHARACTER_IDS) {
+      const parts = buildParts('chibi', CANDY_THEME, character);
+      const hulls = parts.parts.filter((part) => part.hull !== null).length;
+      expect(parts.parts.length, `${character} mesh count`).toBeLessThanOrEqual(15);
+      expect(hulls, `${character} hull count`).toBeLessThanOrEqual(8);
+      parts.dispose();
+    }
   });
 
   it('leaves the classic miner unoutlined', () => {
@@ -70,12 +92,14 @@ describe('buildParts', () => {
 });
 
 describe('Miner', () => {
-  for (const [label, theme] of [
-    ['classic', EMBER_THEME],
-    ['chibi', CANDY_THEME],
+  for (const [label, theme, character] of [
+    ['classic', EMBER_THEME, undefined],
+    ['chibi girl', CANDY_THEME, 'girl'],
+    ['chibi boy', CANDY_THEME, 'boy'],
+    ['chibi robot', CANDY_THEME, 'robot'],
   ] as const) {
     it(`animates the ${label} rig without throwing`, () => {
-      const miner = new Miner(theme);
+      const miner = character === undefined ? new Miner(theme) : new Miner(theme, character);
       miner.setMotion('walk');
       miner.startSwing(0.16);
       for (let i = 0; i < 40; i++) miner.update(1 / 60);

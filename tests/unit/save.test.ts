@@ -11,6 +11,7 @@ import {
 } from '../../src/core/save.ts';
 import { SAVE_SCHEMA_VERSION } from '../../src/config/version.ts';
 import { PICKAXE_MAX_LEVEL } from '../../src/config/economy.ts';
+import { DEFAULT_CHARACTER } from '../../src/config/characters.ts';
 import { DEFAULT_THEME } from '../../src/config/theme.ts';
 
 describe('save profile', () => {
@@ -137,9 +138,24 @@ describe('save theme migration', () => {
 
   it('migrates a v1 save by filling in the theme', () => {
     const migrated = migrateProfile({ schemaVersion: 1, cash: 10 });
-    expect(migrated.schemaVersion).toBe(2);
+    expect(migrated.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
     expect(migrated.settings.theme).toBe(DEFAULT_THEME);
     expect(migrated.cash).toBe(10);
+  });
+
+  it('migrates a v2 save by filling in the character', () => {
+    const migrated = migrateProfile({ schemaVersion: 2, cash: 10, settings: { theme: 'ember' } });
+    expect(migrated.schemaVersion).toBe(SAVE_SCHEMA_VERSION);
+    expect(migrated.settings.character).toBe(DEFAULT_CHARACTER);
+    expect(migrated.settings.theme).toBe('ember');
+    expect(migrated.cash).toBe(10);
+  });
+
+  it('keeps a valid stored character and falls back on garbage', () => {
+    expect(sanitizeProfile({ settings: { character: 'robot' } }).settings.character).toBe('robot');
+    for (const character of ['alien', 42, null, undefined, {}]) {
+      expect(sanitizeProfile({ settings: { character } }).settings.character).toBe(DEFAULT_CHARACTER);
+    }
   });
 
   it('is idempotent: migrating twice changes nothing', () => {

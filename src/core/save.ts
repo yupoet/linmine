@@ -10,6 +10,7 @@
 import { PICKAXE_MAX_LEVEL, type ChestTier } from '../config/economy.ts';
 import { CARDS } from '../config/cards.ts';
 import { LEVELS } from '../config/levels.ts';
+import { DEFAULT_CHARACTER, isCharacterId, type CharacterId } from '../config/characters.ts';
 import { DEFAULT_THEME, isThemeId, type ThemeId } from '../config/theme.ts';
 import { CONFIG_VERSION, SAVE_SCHEMA_VERSION } from '../config/version.ts';
 
@@ -33,6 +34,8 @@ export interface ProfileSettings {
   lang: 'zh' | 'en';
   /** Visual skin. Candy is the default; ember is the legacy look. */
   theme: ThemeId;
+  /** Playable character. The little girl is the default. */
+  character: CharacterId;
 }
 
 export interface LifetimeStats {
@@ -68,7 +71,14 @@ export function createProfile(): Profile {
     cards: {},
     levels: Object.fromEntries(LEVELS.map((level) => [level.id, emptyLevelRecord()])),
     pendingChests: [],
-    settings: { muted: false, reducedMotion: false, haptics: true, lang: 'zh', theme: DEFAULT_THEME },
+    settings: {
+      muted: false,
+      reducedMotion: false,
+      haptics: true,
+      lang: 'zh',
+      theme: DEFAULT_THEME,
+      character: DEFAULT_CHARACTER,
+    },
     tutorialDone: false,
     stats: { runs: 0, wins: 0, deepestRow: 0, blocksMined: 0, chestsOpened: 0 },
     updatedAt: 0,
@@ -160,6 +170,7 @@ export function sanitizeProfile(raw: unknown): Profile {
       haptics: bool(raw.settings.haptics, true),
       lang: raw.settings.lang === 'en' ? 'en' : 'zh',
       theme: isThemeId(raw.settings.theme) ? raw.settings.theme : DEFAULT_THEME,
+      character: isCharacterId(raw.settings.character) ? raw.settings.character : DEFAULT_CHARACTER,
     };
   }
 
@@ -200,6 +211,20 @@ export function migrateProfile(raw: unknown): Profile {
       ...current,
       schemaVersion: 2,
       settings: { ...settings, theme: isThemeId(settings.theme) ? settings.theme : DEFAULT_THEME },
+    };
+  }
+
+  // v2 -> v3: playable characters arrive. Same pattern as v2: default the new
+  // setting so the sanitizer keeps it.
+  if (version < 3) {
+    const settings = isRecord(current.settings) ? current.settings : {};
+    current = {
+      ...current,
+      schemaVersion: 3,
+      settings: {
+        ...settings,
+        character: isCharacterId(settings.character) ? settings.character : DEFAULT_CHARACTER,
+      },
     };
   }
 

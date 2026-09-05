@@ -3,6 +3,7 @@ import { BlockField } from './blocks.ts';
 import { Particles } from './fx.ts';
 import { HighlightField } from './highlights.ts';
 import { Miner } from './miner.ts';
+import type { CharacterId } from '../config/characters.ts';
 import type { RenderTheme } from './themes/types.ts';
 
 /**
@@ -27,12 +28,12 @@ export interface SceneLights {
   readonly lamp: PointLight;
 }
 
-export function buildSkin(theme: RenderTheme, gridWidth: number): SkinResources {
+export function buildSkin(theme: RenderTheme, gridWidth: number, character: CharacterId): SkinResources {
   return {
     theme,
     field: new BlockField(gridWidth, theme),
     highlights: new HighlightField(theme),
-    miner: new Miner(theme),
+    miner: new Miner(theme, character),
     particles: new Particles(theme),
   };
 }

@@ -1,6 +1,7 @@
 import { Group } from 'three';
 import { PLAYER_Z, feetY, worldX } from './constants.ts';
 import { buildParts, type MinerParts, type PartSlot } from './minerParts.ts';
+import { DEFAULT_CHARACTER, type CharacterId } from '../config/characters.ts';
 import type { RenderTheme } from './themes/types.ts';
 
 export type MinerMotion = 'idle' | 'walk' | 'fall';
@@ -60,11 +61,11 @@ export class Miner {
   private landT = -1;
   private landStrength = 1;
 
-  constructor(theme: RenderTheme) {
+  constructor(theme: RenderTheme, character: CharacterId = DEFAULT_CHARACTER) {
     this.group.add(this.tilt);
     this.tilt.add(this.body);
 
-    this.parts = buildParts(theme.miner.variant, theme);
+    this.parts = buildParts(theme.miner.variant, theme, character);
     const { armX, armY, legX, legY } = this.parts.pivots;
     this.armLeft.position.set(-armX, armY, 0);
     this.armRight.position.set(armX, armY, 0);

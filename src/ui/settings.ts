@@ -13,6 +13,7 @@ import {
   setText,
   text,
 } from './dom.ts';
+import { CHARACTER_IDS, DEFAULT_CHARACTER, type CharacterId } from '../config/characters.ts';
 import { DEFAULT_THEME, type ThemeId } from '../config/theme.ts';
 import { t, type Lang } from '../i18n/index.ts';
 import { svg } from './icons.ts';
@@ -23,8 +24,16 @@ const EMPTY_SETTINGS: SettingsView = {
   haptics: false,
   lang: 'zh',
   theme: DEFAULT_THEME,
+  character: DEFAULT_CHARACTER,
   schemaVersion: 0,
   configVersion: '',
+};
+
+/** i18n key for each character id, in picker order. */
+const CHARACTER_LABELS: Record<CharacterId, string> = {
+  girl: 'Little girl',
+  boy: 'Miner boy',
+  robot: 'Robot',
 };
 
 const RESET_CONFIRM_MS = 4000;
@@ -45,6 +54,7 @@ export function createSettings(handlers: {
   setHaptics(value: boolean): void;
   setLang(lang: Lang): void;
   setTheme(theme: ThemeId): void;
+  setCharacter(character: CharacterId): void;
   resetSave(): void;
   goToTitle(): void;
 }): SettingsScreen {
@@ -109,6 +119,21 @@ export function createSettings(handlers: {
     h('div', 'skinbtns', [candyBtn, emberBtn]),
   ]);
 
+  // --- character ----------------------------------------------------------
+  // Same segmented pattern as the skin row; only reskins the chibi miner, so
+  // ember players see no change until they switch back to candy.
+  const charBtns = new Map<CharacterId, HTMLButtonElement>();
+  for (const id of CHARACTER_IDS) {
+    const btn = h('button', 'skinbtn', [t(CHARACTER_LABELS[id])]);
+    btn.type = 'button';
+    btn.addEventListener('click', () => handlers.setCharacter(id));
+    charBtns.set(id, btn);
+  }
+  const charRow = h('div', 'settings__skin settings__character', [
+    h('span', 'switch__label', [t('Character')]),
+    h('div', 'skinbtns', [...charBtns.values()]),
+  ]);
+
   const reset = h('button', 'btn btn--danger', [t('Reset save')]);
   reset.type = 'button';
   let resetArmed = false;
@@ -149,6 +174,7 @@ export function createSettings(handlers: {
       panelBody([
         langRow,
         skinRow,
+        charRow,
         h('div', 'settings__group', [sound.root, motion.root, haptics.root]),
         h('div', 'settings__group settings__group--danger', [
           h('p', 'settings__note', [t('Erasing your save removes cash, cards and level progress.')]),
@@ -180,6 +206,8 @@ export function createSettings(handlers: {
       const theme: ThemeId = v.theme === 'ember' ? 'ember' : 'candy';
       candyBtn.classList.toggle('is-on', theme === 'candy');
       emberBtn.classList.toggle('is-on', theme === 'ember');
+      const character: CharacterId = charBtns.has(v.character) ? v.character : DEFAULT_CHARACTER;
+      for (const [id, btn] of charBtns) btn.classList.toggle('is-on', id === character);
       setText(
         version,
         t('Save v{n} · Config {v}', { n: Math.round(num(v.schemaVersion)), v: text(v.configVersion, 'unknown') }),

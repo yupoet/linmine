@@ -9,6 +9,7 @@
  */
 
 import type { ChestTier, Settlement } from '../config/economy.ts';
+import type { CharacterId } from '../config/characters.ts';
 import type { ThemeId } from '../config/theme.ts';
 import type { TargetInfo } from '../core/run.ts';
 import type { Cell, DigResult, RunState, RunStats } from '../core/types.ts';
@@ -92,6 +93,7 @@ export interface SettingsView {
   haptics: boolean;
   lang: 'zh' | 'en';
   theme: ThemeId;
+  character: CharacterId;
   schemaVersion: number;
   configVersion: string;
 }
@@ -122,6 +124,7 @@ export interface UIHandlers {
   setHaptics(value: boolean): void;
   setLang(lang: 'zh' | 'en'): void;
   setTheme(theme: ThemeId): void;
+  setCharacter(character: CharacterId): void;
   resetSave(): void;
   dismissTutorial(): void;
 }
@@ -187,4 +190,6 @@ export interface RendererAPI {
   dispose(): void;
   /** Swap the visual skin. Rebuilding is deferred until the scene is idle. */
   setTheme(theme: ThemeId): void;
+  /** Swap the playable character. Same deferred rebuild as `setTheme`. */
+  setCharacter(character: CharacterId): void;
 }

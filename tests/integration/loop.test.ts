@@ -26,6 +26,7 @@ import { PICKAXE_MAX_LEVEL } from '../../src/config/economy.ts';
 import { LEVELS } from '../../src/config/levels.ts';
 import { getLegalTargets } from '../../src/core/run.ts';
 import { BlockKind } from '../../src/config/blocks.ts';
+import { DEFAULT_CHARACTER, type CharacterId } from '../../src/config/characters.ts';
 import { DEFAULT_THEME, type ThemeId } from '../../src/config/theme.ts';
 import type { Cell, DigResult, RunState } from '../../src/core/types.ts';
 import type { TargetInfo } from '../../src/core/run.ts';
@@ -73,13 +74,18 @@ function createTestStore(): KeyValueStore {
   };
 }
 
-function createStubRenderer(): RendererAPI & { picked: Cell | null; themes: ThemeId[] } {
+function createStubRenderer(): RendererAPI & { picked: Cell | null; themes: ThemeId[]; characters: CharacterId[] } {
   const themes: ThemeId[] = [];
+  const characters: CharacterId[] = [];
   return {
     picked: null,
     themes,
+    characters,
     setTheme(theme) {
       themes.push(theme);
+    },
+    setCharacter(character) {
+      characters.push(character);
     },
     setState() {},
     playDig() {
@@ -418,6 +424,32 @@ describe('app loop', () => {
     expect(recorder.uiThemes.at(-1)).toBe('ember');
     expect(recorder.settings?.theme).toBe('ember');
     expect(store.getItem(THEME_MIRROR_KEY)).toBe('ember');
+  });
+
+  it('boots on the default character and reports it in the settings view', () => {
+    const { ui, recorder, renderer } = setup();
+    ui.goToSettings();
+    expect(recorder.settings?.character).toBe(DEFAULT_CHARACTER);
+    expect(renderer.characters).toContain(DEFAULT_CHARACTER);
+  });
+
+  it('switches the character into the renderer and persists it', () => {
+    const { game, ui, recorder, renderer } = setup();
+    ui.goToSettings();
+    ui.setCharacter('robot');
+
+    expect(game.getProfile().settings.character).toBe('robot');
+    expect(renderer.characters.at(-1)).toBe('robot');
+    expect(recorder.settings?.character).toBe('robot');
+  });
+
+  it('boots the saved character after a reload', () => {
+    const first = setup();
+    first.ui.setCharacter('boy');
+
+    const second = setup({ store: first.store });
+    expect(second.game.getProfile().settings.character).toBe('boy');
+    expect(second.renderer.characters).toContain('boy');
   });
 
   it('boots the saved skin after a reload', () => {

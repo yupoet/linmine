@@ -15,8 +15,10 @@ import {
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { toonGradient } from './blockHull.ts';
+import { CHARACTER_RECIPES, type CharacterRecipe } from './characters.ts';
 import { CUBE_SIZE } from './constants.ts';
-import type { MinerVariant, RenderTheme } from './themes/types.ts';
+import type { CharacterId } from '../config/characters.ts';
+import type { MinerPalette, MinerVariant, RenderTheme } from './themes/types.ts';
 
 /**
  * What hangs off the miner's rig.
@@ -71,21 +73,31 @@ export interface MinerParts {
  * line — so only the larger half of each pair (sleeve, thigh, pick head) is
  * outlined.
  */
-export const HULL_SKIP: readonly string[] = ['lampLens', 'face', 'handL', 'handR', 'bootL', 'bootR', 'pickHandle'];
+export const HULL_SKIP: readonly string[] = [
+  'lampLens',
+  'face',
+  'handL',
+  'handR',
+  'bootL',
+  'bootR',
+  'pickHandle',
+  'antenna',
+  'antennaBulb',
+];
 
 const SKIP = new Set(HULL_SKIP);
 
 /** Per-part shell thickness: bigger parts can carry a slightly thinner line. */
 function inflateFor(name: string): number {
-  if (name === 'head' || name === 'helmet') return 1.1;
+  if (name === 'head' || name === 'helmet' || name === 'hair') return 1.1;
   if (name === 'pickHead') return 1.08;
   if (name === 'torso' || name === 'hips' || name === 'torsoHips') return 1.09;
   return 1.12;
 }
 
-export function buildParts(variant: MinerVariant, theme: RenderTheme): MinerParts {
+export function buildParts(variant: MinerVariant, theme: RenderTheme, character: CharacterId = 'boy'): MinerParts {
   const builder = new PartBuilder(theme);
-  const parts = variant === 'chibi' ? builder.chibi() : builder.classic();
+  const parts = variant === 'chibi' ? builder.chibi(CHARACTER_RECIPES[character]) : builder.classic();
   return {
     parts,
     pivots: builder.pivots,
@@ -173,9 +185,13 @@ class PartBuilder {
    * helmet+brim+band+lamp, the whole face, pick head+blades) are baked into one
    * vertex-tinted mesh each — 15 meshes instead of 28, which is what keeps the
    * chibi miner inside the draw-call budget (ember + 15 for the whole scene).
+   *
+   * The recipe picks the palette, the headgear (helmet / twin buns / antenna)
+   * and the bottom (trousers / dress); the rig, the face and the limbs are
+   * shared by every character.
    */
-  chibi(): MinerPart[] {
-    const p = this.theme.miner.palette;
+  chibi(recipe: CharacterRecipe): MinerPart[] {
+    const p = recipe.palette;
     this.share = true;
     this.pivots = { armX: 0.22, armY: 0.52, legX: 0.09, legY: 0.24 };
     // Head 0.37 tall against a 0.18..0.52 body: the 1 : 0.92 ratio the bible asks for.
@@ -183,18 +199,17 @@ class PartBuilder {
     this.bodySize = 0.34;
 
     const parts: MinerPart[] = [
-      this.merged('torsoHips', 'body', [
-        { geometry: this.box(0.36, 0.12, 0.26), color: p.trousers, at: [0, 0.24, 0] },
-        { geometry: this.box(0.42, 0.26, 0.3), color: p.shirt, at: [0, 0.39, 0] },
-      ], [0, 0.315, 0]),
+      recipe.skirt
+        ? this.merged('torsoHips', 'body', [
+            { geometry: this.tapered(0.2, 0.27, 0.16), color: p.shirt, at: [0, 0.22, 0] },
+            { geometry: this.box(0.42, 0.26, 0.3), color: p.shirt, at: [0, 0.39, 0] },
+          ], [0, 0.305, 0])
+        : this.merged('torsoHips', 'body', [
+            { geometry: this.box(0.36, 0.12, 0.26), color: p.trousers, at: [0, 0.24, 0] },
+            { geometry: this.box(0.42, 0.26, 0.3), color: p.shirt, at: [0, 0.39, 0] },
+          ], [0, 0.315, 0]),
       this.part('head', 'body', this.sphere(0.185, 20, 14), p.skin, [0, 0.69, 0]),
-      this.merged('helmet', 'body', [
-        { geometry: this.sphere(0.195, 20, 12), color: p.helmet, at: [0, 0.78, 0], scale: [1, 0.62, 1] },
-        { geometry: this.cylinder(0.2, 0.035), color: p.brim, at: [0, 0.655, 0] },
-        { geometry: this.cylinder(0.188, 0.03), color: p.band, at: [0, 0.7, 0] },
-        { geometry: this.cylinder(0.04, 0.05), color: p.lamp, at: [0, 0.74, 0.17] },
-      ], [0, 0.72, 0]),
-      this.flatPart('lampLens', 'body', this.sphere(0.048, 10, 8), p.lampLens, [0, 0.74, 0.2]),
+      ...this.headgear(recipe, p),
     ];
 
     const face: MergePiece[] = [];
@@ -242,6 +257,40 @@ class PartBuilder {
   }
 
   // --- helpers --------------------------------------------------------------
+
+  /** What sits on the head: the boy's helmet, the girl's twin buns, the robot's antenna. */
+  private headgear(recipe: CharacterRecipe, p: MinerPalette): MinerPart[] {
+    switch (recipe.headgear) {
+      case 'twintails':
+        // Hair cap plus two buns; the cluster is outlined like a helmet.
+        return [
+          this.merged('hair', 'body', [
+            { geometry: this.sphere(0.195, 20, 12), color: p.helmet, at: [0, 0.78, 0], scale: [1, 0.62, 1] },
+            { geometry: this.sphere(0.08, 12, 10), color: p.helmet, at: [-0.185, 0.72, 0] },
+            { geometry: this.sphere(0.08, 12, 10), color: p.helmet, at: [0.185, 0.72, 0] },
+          ], [0, 0.74, 0]),
+        ];
+      case 'antenna':
+        // Thin detail stays unoutlined (it would blob); only the bulb glows.
+        return [
+          this.merged('antenna', 'body', [
+            { geometry: this.cylinder(0.16, 0.05), color: p.helmet, at: [0, 0.85, 0] },
+            { geometry: this.cylinder(0.02, 0.14), color: p.brim, at: [0, 0.94, 0] },
+          ], [0, 0.9, 0]),
+          this.flatPart('antennaBulb', 'body', this.sphere(0.045, 10, 8), p.lampLens, [0, 1.02, 0]),
+        ];
+      default:
+        return [
+          this.merged('helmet', 'body', [
+            { geometry: this.sphere(0.195, 20, 12), color: p.helmet, at: [0, 0.78, 0], scale: [1, 0.62, 1] },
+            { geometry: this.cylinder(0.2, 0.035), color: p.brim, at: [0, 0.655, 0] },
+            { geometry: this.cylinder(0.188, 0.03), color: p.band, at: [0, 0.7, 0] },
+            { geometry: this.cylinder(0.04, 0.05), color: p.lamp, at: [0, 0.74, 0.17] },
+          ], [0, 0.72, 0]),
+          this.flatPart('lampLens', 'body', this.sphere(0.048, 10, 8), p.lampLens, [0, 0.74, 0.2]),
+        ];
+    }
+  }
 
   private part(
     name: string,
@@ -392,6 +441,11 @@ class PartBuilder {
 
   private cylinder(radius: number, height: number): BufferGeometry {
     return this.keep(new CylinderGeometry(radius, radius, height, 16));
+  }
+
+  /** Tapered cylinder (the girl's skirt flares towards the hem). */
+  private tapered(radiusTop: number, radiusBottom: number, height: number): BufferGeometry {
+    return this.keep(new CylinderGeometry(radiusTop, radiusBottom, height, 16));
   }
 
   private capsule(radius: number, length: number): BufferGeometry {

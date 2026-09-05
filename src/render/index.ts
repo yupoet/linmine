@@ -13,6 +13,7 @@ import {
   WebGLRenderer,
 } from 'three';
 import type { RendererAPI, RendererOptions } from '../app/contracts.ts';
+import { DEFAULT_CHARACTER, type CharacterId } from '../config/characters.ts';
 import { DEFAULT_THEME, type ThemeId } from '../config/theme.ts';
 import { BlockKind, BLOCKS } from '../config/blocks.ts';
 import type { TargetInfo } from '../core/run.ts';
@@ -95,6 +96,8 @@ class SceneRenderer implements RendererAPI {
   private reducedMotion = false;
   private theme: RenderTheme;
   private pendingTheme: ThemeId | null = null;
+  private character: CharacterId = DEFAULT_CHARACTER;
+  private pendingCharacter: CharacterId | null = null;
   private readonly webgl2: boolean;
   private contextLost = false;
 
@@ -174,7 +177,7 @@ class SceneRenderer implements RendererAPI {
     this.lamp.position.set(...lights.lampPosition);
 
     this.dom = new DomLayer(this.theme);
-    this.skin = buildSkin(this.theme, this.gridWidth);
+    this.skin = buildSkin(this.theme, this.gridWidth, this.character);
     this.miner.group.add(this.lamp);
     this.scene.add(this.hemi, this.sun);
     attachSkin(this.scene, this.skin);
@@ -311,13 +314,21 @@ class SceneRenderer implements RendererAPI {
   }
 
   update(dt: number): void {
-    // A skin swap waits for an idle frame and lands before quality adaptation,
-    // so the rest of this frame measures the resources it just built.
-    if (this.pendingTheme !== null) {
-      const next = this.pendingTheme;
+    // A skin or character swap waits for an idle frame and lands before quality
+    // adaptation, so the rest of this frame measures the resources it just built.
+    if (this.pendingTheme !== null || this.pendingCharacter !== null) {
+      const nextTheme = this.pendingTheme;
+      const nextCharacter = this.pendingCharacter;
       this.pendingTheme = null;
-      if (shouldApplyPendingTheme(next, this.theme.id, this.playing)) this.rebuildSkin(next);
-      else if (next !== this.theme.id) this.pendingTheme = next;
+      this.pendingCharacter = null;
+      const themeDirty = shouldApplyPendingTheme(nextTheme, this.theme.id, this.playing);
+      const characterDirty = nextCharacter !== null && nextCharacter !== this.character && !this.playing;
+      if (themeDirty || characterDirty) {
+        this.rebuildSkin(themeDirty && nextTheme !== null ? nextTheme : this.theme.id, nextCharacter ?? this.character);
+      } else {
+        if (nextTheme !== null && nextTheme !== this.theme.id) this.pendingTheme = nextTheme;
+        if (nextCharacter !== null && nextCharacter !== this.character) this.pendingCharacter = nextCharacter;
+      }
     }
 
     const step = dt > 0 ? dt : 0;
@@ -416,6 +427,15 @@ class SceneRenderer implements RendererAPI {
     this.pendingTheme = theme;
   }
 
+  /** Same deferred rebuild as `setTheme` — only the miner's recipe changes. */
+  setCharacter(character: CharacterId): void {
+    if (character === this.character) {
+      this.pendingCharacter = null;
+      return;
+    }
+    this.pendingCharacter = character;
+  }
+
   /**
    * Swap every skin-owned scene resource, preserving the run.
    *
@@ -425,7 +445,7 @@ class SceneRenderer implements RendererAPI {
    * highlights, miner and particle pool. The lights are reused as objects and
    * only reparameterised, so no material in the scene has to recompile.
    */
-  private rebuildSkin(id: ThemeId): void {
+  private rebuildSkin(id: ThemeId, character: CharacterId): void {
     const theme = this.resolveTheme(id);
     const minerVisible = this.miner.group.visible;
     const facing = this.miner.facing;
@@ -439,7 +459,8 @@ class SceneRenderer implements RendererAPI {
     releaseSkin(this.scene, this.skin);
 
     this.theme = theme;
-    this.skin = buildSkin(theme, this.gridWidth);
+    this.character = character;
+    this.skin = buildSkin(theme, this.gridWidth, character);
     applyLights(theme, { hemi: this.hemi, sun: this.sun, lamp: this.lamp });
     this.miner.group.add(this.lamp);
     this.dom.setTheme(theme);
