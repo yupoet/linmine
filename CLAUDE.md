@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 npm run dev          # Vite dev server at http://localhost:5173
 npm run typecheck    # tsc --noEmit (strict, noUnusedLocals/noUnusedParameters)
-npm test             # vitest run — 111 tests (unit + property + integration), all must pass
+npm test             # vitest run — unit + property + integration, all must pass
 npm run test:watch   # vitest watch mode
 npx vitest run tests/unit/chain.test.ts             # one test file
 npx vitest run tests/unit/chain.test.ts -t "widens"  # one test by name
@@ -44,6 +44,7 @@ render/  ui/  platform/  →  app/  →  core/  config/
 - `src/render/` — Three.js view of a `RunState`; never mutates game state. `index.ts` holds the dig sequencer: a tap is laid out as absolute times (walk 0.1s/cell + swing 0.16s + chain stagger 0.09s) compressed into `DIG_BUDGET=0.75s`; falls never compress. `blocks.ts` is one `InstancedMesh` with recycled slots plus hit-flash. `roundedBox.ts` is a local copy of a three.js example (MIT).
 - `src/ui/` — DOM screens, pure views consuming view models and calling back through handlers. `index.ts` builds all screens; **a language switch rebuilds the whole UI** through the `rebuildUI` factory passed from `main.ts`.
 - `src/platform/` — `storage.ts` (checksummed envelope at `linmine.save` + `linmine.save.bak` backup; in-memory fallback in private mode), `audio.ts` (all SFX synthesized with WebAudio, no audio files), `clock.ts` (rAF with clamped dt), `input.ts` (pointer with tap slop).
+- **Themes (skins)** — `src/config/theme.ts` defines `ThemeId = 'candy' | 'ember'` (candy default, ember is the original look). The choice lives in `profile.settings.theme` (save schema v2) and is mirrored as plain text at `localStorage['linmine.theme']` so the inline script in `index.html` can paint the right skin before any module loads. UI side: `<html data-theme>` and `.ui[data-theme]`; the base `.ui {}` block in `styles.css` IS ember, `src/ui/theme-candy.css` only overrides candy. Render side: `src/render/themes/*` `RenderTheme` objects; render never reads CSS variables. `RendererAPI.setTheme` defers the rebuild until the dig sequencer is idle. Style rules: `docs/art/STYLE_BIBLE.md`. Visual scripts take `THEME=candy|ember`; `scripts/ui-shots.mjs` gives deterministic DOM-only screenshots for pixel diffs.
 - `src/i18n/` — English strings are the keys; the `zh` dictionary maps them to Chinese. Use `t('Need {n} more cash', {n})`. Missing keys silently fall back to English. `tCardDesc`/`tChest`/`tLevel` localize config data.
 - `src/main.ts` — wires everything; late-binds `UIHandlers` via a Proxy because the UI is built before the game exists. Registers `public/sw.js` for offline play.
 
