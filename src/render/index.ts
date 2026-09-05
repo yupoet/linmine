@@ -110,6 +110,9 @@ class SceneRenderer implements RendererAPI {
   private fps = 60;
   private lastDrawCalls = 0;
   private lastInstances = 0;
+  private qualityScale = 1;
+  private lowFpsStreak = 0;
+  private highFpsStreak = 0;
 
   // --- dig sequencer --------------------------------------------------------
   private playing = false;
@@ -259,6 +262,7 @@ class SceneRenderer implements RendererAPI {
     const step = dt > 0 ? dt : 0;
     this.time += step;
     if (step > 0) this.fps += (1 / step - this.fps) * (1 - Math.exp(-3 * step));
+    this.adaptQuality();
 
     this.advanceDig(step);
     this.miner.update(step);
@@ -270,6 +274,32 @@ class SceneRenderer implements RendererAPI {
     this.updateCamera(step);
     this.highlights.update(this.time);
     this.dom.update(step, this.project);
+  }
+
+  // Drop pixel ratio when the GPU can't sustain 60fps, restore it slowly
+  // once frames recover. Hysteresis avoids a flickering toggle.
+  private adaptQuality(): void {
+    if (this.qualityScale === 1) {
+      if (this.fps < 48) this.lowFpsStreak += 1 / 60;
+      else this.lowFpsStreak = 0;
+      if (this.lowFpsStreak > 1.5) {
+        this.qualityScale = 0.75;
+        this.applyQuality();
+      }
+    } else if (this.qualityScale === 0.75) {
+      if (this.fps > 57) this.highFpsStreak += 1 / 60;
+      else this.highFpsStreak = 0;
+      if (this.highFpsStreak > 3) {
+        this.qualityScale = 1;
+        this.applyQuality();
+      }
+    }
+  }
+
+  private applyQuality(): void {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2) * this.qualityScale;
+    this.renderer.setPixelRatio(dpr);
+    this.renderer.setSize(this.viewWidth, this.viewHeight, false);
   }
 
   render(): void {
@@ -291,7 +321,7 @@ class SceneRenderer implements RendererAPI {
       height = Math.max(1, window.innerHeight);
     }
 
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2) * this.qualityScale);
     this.renderer.setSize(width, height, degenerate);
 
     const aspect = width / Math.max(1, height);

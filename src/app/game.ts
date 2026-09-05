@@ -328,23 +328,42 @@ export function createGame(deps: GameDeps): GameAPI {
 
   function playSoundsFor(result: DigResult): void {
     const impact = estimatedImpactDelay(result);
-    const isTerrain = result.removed.some((entry) => entry.kind === BlockKind.Dirt || entry.kind === BlockKind.Stone);
+    const terrainBlock = result.removed.find((entry) => entry.source === 'dig');
+    const oreInChain = result.removed.some(
+      (entry) => entry.source === 'chain' && (entry.kind === BlockKind.Gold || entry.kind === BlockKind.Copper),
+    );
 
+    // Initial impact: pitch tracks the tapped block's hardness so stone reads
+    // as a thud and dirt as a soft scrape, without burning an extra voice.
+    const initialIntensity = terrainBlock
+      ? terrainBlock.kind === BlockKind.Stone
+        ? 0.7
+        : terrainBlock.kind === BlockKind.Gold
+          ? 0.85
+          : 0.4
+      : 0.6;
     setTimeout(() => {
-      audio.play(isTerrain ? 'dig' : 'break', 0.4);
+      audio.play(terrainBlock ? 'dig' : 'break', initialIntensity);
     }, impact);
 
     const chainBlocks = result.removed.filter((entry) => entry.source === 'chain');
     if (chainBlocks.length > 0) {
       const waves = Math.max(...chainBlocks.map((entry) => entry.wave));
       for (let wave = 1; wave <= waves; wave++) {
+        const waveIntensity = Math.min(1, 0.4 + wave * 0.18);
         setTimeout(() => {
-          audio.play('explode', Math.min(1, 0.4 + wave * 0.15));
-          vibrate(18 + wave * 6);
+          audio.play('explode', waveIntensity);
+          vibrate(Math.min(60, 18 + wave * 7));
         }, impact + 90 + wave * 90);
       }
       setTimeout(() => {
-        audio.play('cash', Math.min(1, chainBlocks.length / 18));
+        audio.play('cash', Math.min(1, chainBlocks.length / 12));
+        if (chainBlocks.length >= 6) {
+          // Triumphant overtone for big payouts.
+          setTimeout(() => audio.play('cash', 1), 60);
+          setTimeout(() => audio.play('cash', 0.9), 130);
+          if (oreInChain) setTimeout(() => audio.play('chest', 0.5), 200);
+        }
       }, impact + 120 + waves * 90);
     }
 
