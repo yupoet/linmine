@@ -93,3 +93,15 @@ Tokenize every stray literal: `.btn--gold/--danger` (~247-262), chip critical `#
 **I2** Merge order P → R → U → A. R and U branch from post-P `main`. Expected conflicts: none in `contracts.ts` (only P touches it); possible `src/ui/settings.ts` overlap between P6 markup and U2 classes (keep P6 markup, apply U2 class names).
 **I3** `scripts/visual.mjs` (+ `visual-i18n.mjs`, `visual-p0.mjs`): read `process.env.THEME` (`candy|ember`, default candy) and `page.addInitScript` to set `localStorage.linmine.theme` before navigation. Run both.
 **I4** Final matrix: typecheck; `npm test`; `npm run sim` zero drift; visual.mjs ×2 themes zero errors; ember pixel diff ≤ 0.5%; `?dev=1` FPS ≥ 90% baseline and drawCalls within budget on both themes; bible §7 DoD on candy; external blind review (codex/kimi/grok) of candy screenshots vs the reference description, adjudicated by the orchestrator.
+
+---
+
+## Addenda (planner second pass, accepted)
+
+- **R3 gate is unit-testable.** Extract `shouldApplyPendingTheme(pending: ThemeId | null, current: ThemeId, playing: boolean): boolean` into `src/render/themeGate.ts` and test it in `tests/unit/theme-rebuild-gate.test.ts` (false when no pending, false while playing, true only for a different id while idle). The check sits at the top of `update(dt)` before `adaptQuality()`.
+- **R4 helper.** `src/render/outlineGeometry.ts` exports `extrudeAlongNormals(geometry, distance)`; unit test that a unit-box corner moves exactly `distance` along its normal. `tests/unit/block-field-outline.test.ts` builds a `BlockField` over a `tests/helpers/grid.ts` fixture (no WebGL needed) and asserts hull/decal `instanceMatrix` reference equality plus `count`/`visible` mirroring after add/removeAt/reset cycles.
+- **R4 quality fallback.** When `qualityScale` drops to 0.75 under candy, the next rebuild uses cookie segments 2.
+- **R6 particles** mirror `count`/`visible` for the hull in `burst/swapRemove/update/clear`.
+- **U1 simplification.** The base `.ui { }` block IS the ember skin; only `.ui[data-theme="candy"] { }` is added. No separate `.ui[data-theme="ember"]` block.
+- **U3 check.** The JS `Counter` tween in `src/ui/dom.ts` is gated by its own `reducedMotion` option (wired from hud/result/levels/shop); confirm it is unaffected by the CSS blanket rule.
+- **I3 draw-call logging.** `scripts/visual.mjs` logs `window.linmine.renderer.stats()` before and after one mid-run `handlers.setTheme(<other>)` call to support the draw-budget gate.
