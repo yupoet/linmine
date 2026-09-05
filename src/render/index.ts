@@ -17,21 +17,14 @@ import { DEFAULT_THEME, type ThemeId } from '../config/theme.ts';
 import { BlockKind, BLOCKS } from '../config/blocks.ts';
 import type { TargetInfo } from '../core/run.ts';
 import type { Cell, DigResult, Removal, RunState } from '../core/types.ts';
-import { BlockField, HighlightField } from './blocks.ts';
 import {
   CAMERA_CATCHUP_ERROR,
   CAMERA_FOCUS_OFFSET,
   CAMERA_FOV,
-  CAMERA_FOV_MAX,
   CAMERA_LERP_K,
-  CAMERA_ROWS,
-  CAMERA_TILT,
   CHAIN_STAGGER,
-  DARK_BY_ROW,
-  DEEP_COLOR,
   DIG_BUDGET,
   SETTLE_TIME,
-  SKY_COLOR,
   STEP_IN_TIME,
   SWING_IMPACT,
   SWING_TIME,
@@ -45,8 +38,13 @@ import {
   worldY,
 } from './constants.ts';
 import { DomLayer, type PopupTone, type Projector } from './dom.ts';
-import { Particles, ScreenShake } from './fx.ts';
-import { Miner } from './miner.ts';
+import { ScreenShake } from './fx.ts';
+import { applyLights, attachSkin, buildSkin, releaseSkin, type SkinResources } from './sceneSkin.ts';
+import { shouldApplyPendingTheme } from './themeGate.ts';
+import { themeById } from './themes/index.ts';
+import type { RenderTheme } from './themes/types.ts';
+import { QualityGovernor } from './quality.ts';
+import { applyAtmosphere, fitView, placeCamera, type AtmosphereTargets, type ViewFit } from './view.ts';
 
 const MAX_WAVES = 8;
 const MAX_SEGMENTS = 16;
@@ -68,18 +66,16 @@ class SceneRenderer implements RendererAPI {
   private readonly onLand: NonNullable<RendererOptions['onLand']>;
   private readonly scene = new Scene();
   private readonly camera = new PerspectiveCamera(CAMERA_FOV, 1, 0.1, 200);
-  private readonly bgColor = new Color(SKY_COLOR);
-  private readonly deepColor = new Color(DEEP_COLOR);
-  private readonly fog = new Fog(SKY_COLOR, 10, 30);
+  private readonly bgColor = new Color();
+  private readonly deepColor = new Color();
+  private readonly fog = new Fog(0x000000, 10, 30);
   private readonly hemi: HemisphereLight;
   private readonly sun: DirectionalLight;
-  private readonly lamp = new PointLight(0xffe6a8, 1.2, 6, 1.8);
-  private readonly field: BlockField;
-  private readonly highlights = new HighlightField();
-  private readonly miner = new Miner();
-  private readonly particles = new Particles();
+  private readonly lamp: PointLight;
   private readonly shake = new ScreenShake();
-  private readonly dom = new DomLayer();
+  private readonly dom: DomLayer;
+  /** Every scene object the current skin owns; replaced wholesale on a swap. */
+  private skin: SkinResources;
 
   // Reused scratch objects: the update/render path must not allocate.
   private readonly ndc = new Vector2();
@@ -90,17 +86,19 @@ class SceneRenderer implements RendererAPI {
   private readonly shakeOffset = new Vector3();
   private readonly tmpColor = new Color();
   private readonly project: Projector;
+  private readonly atmosphere: AtmosphereTargets;
 
   private state: RunState | null = null;
   private targets: readonly TargetInfo[] = EMPTY_TARGETS;
   private hover: Cell | null = null;
   private gridWidth: number;
   private reducedMotion = false;
-  private theme: ThemeId = DEFAULT_THEME;
+  private theme: RenderTheme;
+  private pendingTheme: ThemeId | null = null;
+  private readonly webgl2: boolean;
   private contextLost = false;
 
-  private camDist = 15;
-  private tiltHeight = 1.5;
+  private fit: ViewFit = { camDist: 15, tiltHeight: 1.5 };
   private camX = 0;
   private camY = 0;
   private viewLeft = 0;
@@ -114,9 +112,7 @@ class SceneRenderer implements RendererAPI {
   private fps = 60;
   private lastDrawCalls = 0;
   private lastInstances = 0;
-  private qualityScale = 1;
-  private lowFpsStreak = 0;
-  private highFpsStreak = 0;
+  private readonly quality = new QualityGovernor();
 
   // --- dig sequencer --------------------------------------------------------
   private playing = false;
@@ -165,15 +161,23 @@ class SceneRenderer implements RendererAPI {
     this.scene.background = this.bgColor;
     this.scene.fog = this.fog;
 
-    this.hemi = new HemisphereLight(0xcfe9ff, 0x3a2a1c, 0.95);
-    this.sun = new DirectionalLight(0xffffff, 1.15);
-    this.sun.position.set(3, 6, 8);
-    this.lamp.position.set(0, 0.8, 0.45);
-    this.miner.group.add(this.lamp);
-    this.scene.add(this.hemi, this.sun, this.miner.group);
+    this.webgl2 = this.renderer.capabilities.isWebGL2;
+    this.theme = this.resolveTheme(DEFAULT_THEME);
+    this.bgColor.setHex(this.theme.atmosphere.sky);
+    this.fog.color.copy(this.bgColor);
 
-    this.field = new BlockField(this.gridWidth);
-    this.scene.add(this.field.mesh, this.highlights.mesh, this.particles.mesh);
+    const lights = this.theme.lights;
+    this.hemi = new HemisphereLight(lights.hemiSky, lights.hemiGround, lights.hemiIntensity);
+    this.sun = new DirectionalLight(lights.sun, lights.sunIntensity);
+    this.sun.position.set(...lights.sunPosition);
+    this.lamp = new PointLight(lights.lamp, lights.lampIntensity, lights.lampDistance, lights.lampDecay);
+    this.lamp.position.set(...lights.lampPosition);
+
+    this.dom = new DomLayer(this.theme);
+    this.skin = buildSkin(this.theme, this.gridWidth);
+    this.miner.group.add(this.lamp);
+    this.scene.add(this.hemi, this.sun);
+    attachSkin(this.scene, this.skin);
 
     for (let i = 0; i < MAX_WAVES; i++) this.waveLists.push([]);
 
@@ -182,6 +186,15 @@ class SceneRenderer implements RendererAPI {
       out.x = this.viewLeft + (out.x * 0.5 + 0.5) * this.viewWidth;
       out.y = this.viewTop + (-out.y * 0.5 + 0.5) * this.viewHeight;
       return out;
+    };
+
+    this.atmosphere = {
+      background: this.bgColor,
+      deep: this.deepColor,
+      fog: this.fog,
+      hemi: this.hemi,
+      sun: this.sun,
+      lamp: this.lamp,
     };
 
     this.dom.attach(document.body);
@@ -193,6 +206,39 @@ class SceneRenderer implements RendererAPI {
     window.addEventListener('orientationchange', this.onResize);
     this.canvas.addEventListener('webglcontextlost', this.onContextLost);
     this.canvas.addEventListener('webglcontextrestored', this.onContextRestored);
+  }
+
+  private get field() {
+    return this.skin.field;
+  }
+
+  private get highlights() {
+    return this.skin.highlights;
+  }
+
+  private get miner() {
+    return this.skin.miner;
+  }
+
+  private get particles() {
+    return this.skin.particles;
+  }
+
+  /**
+   * The theme as this device can actually render it.
+   *
+   * Toon materials with per-instance colour are unreliable on some WebGL1
+   * Android drivers, so those fall back to standard shading while keeping the
+   * candy palette, outlines and decals. A device already running at reduced
+   * pixel ratio also drops the cookie geometry back to 2 segments.
+   */
+  private resolveTheme(id: ThemeId): RenderTheme {
+    let theme = themeById(id);
+    if (!this.webgl2 && theme.shading === 'toon') theme = { ...theme, shading: 'standard' };
+    if (this.quality.scale < 1 && theme.geometry.segments > 2) {
+      theme = { ...theme, geometry: { ...theme.geometry, segments: 2 } };
+    }
+    return theme;
   }
 
   // --- RendererAPI ----------------------------------------------------------
@@ -265,10 +311,19 @@ class SceneRenderer implements RendererAPI {
   }
 
   update(dt: number): void {
+    // A skin swap waits for an idle frame and lands before quality adaptation,
+    // so the rest of this frame measures the resources it just built.
+    if (this.pendingTheme !== null) {
+      const next = this.pendingTheme;
+      this.pendingTheme = null;
+      if (shouldApplyPendingTheme(next, this.theme.id, this.playing)) this.rebuildSkin(next);
+      else if (next !== this.theme.id) this.pendingTheme = next;
+    }
+
     const step = dt > 0 ? dt : 0;
     this.time += step;
     if (step > 0) this.fps += (1 / step - this.fps) * (1 - Math.exp(-3 * step));
-    this.adaptQuality();
+    if (this.quality.update(this.fps)) this.applyQuality();
 
     this.advanceDig(step);
     this.miner.update(step);
@@ -283,28 +338,8 @@ class SceneRenderer implements RendererAPI {
     this.dom.update(step, this.project);
   }
 
-  // Drop pixel ratio when the GPU can't sustain 60fps, restore it slowly
-  // once frames recover. Hysteresis avoids a flickering toggle.
-  private adaptQuality(): void {
-    if (this.qualityScale === 1) {
-      if (this.fps < 48) this.lowFpsStreak += 1 / 60;
-      else this.lowFpsStreak = 0;
-      if (this.lowFpsStreak > 1.5) {
-        this.qualityScale = 0.75;
-        this.applyQuality();
-      }
-    } else if (this.qualityScale === 0.75) {
-      if (this.fps > 57) this.highFpsStreak += 1 / 60;
-      else this.highFpsStreak = 0;
-      if (this.highFpsStreak > 3) {
-        this.qualityScale = 1;
-        this.applyQuality();
-      }
-    }
-  }
-
   private applyQuality(): void {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2) * this.qualityScale;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2) * this.quality.scale;
     this.renderer.setPixelRatio(dpr);
     this.renderer.setSize(this.viewWidth, this.viewHeight, false);
   }
@@ -328,21 +363,10 @@ class SceneRenderer implements RendererAPI {
       height = Math.max(1, window.innerHeight);
     }
 
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2) * this.qualityScale);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2) * this.quality.scale);
     this.renderer.setSize(width, height, degenerate);
 
-    const aspect = width / Math.max(1, height);
-    // Tall/narrow screens widen the fov so every column still fits.
-    const fov = aspect >= 0.6 ? CAMERA_FOV : Math.min(CAMERA_FOV_MAX, CAMERA_FOV + (0.6 - aspect) * 90);
-    const halfV = Math.tan((fov * Math.PI) / 360);
-    const distForRows = CAMERA_ROWS / (2 * halfV);
-    const distForWidth = (this.gridWidth + 1.4) / (2 * halfV * aspect);
-
-    this.camera.fov = fov;
-    this.camera.aspect = aspect;
-    this.camera.updateProjectionMatrix();
-    this.camDist = Math.max(distForRows, distForWidth) * 1.04;
-    this.tiltHeight = this.camDist * Math.tan(CAMERA_TILT);
+    this.fit = fitView(this.camera, width, height, this.gridWidth);
 
     this.viewLeft = rect.left;
     this.viewTop = rect.top;
@@ -378,12 +402,65 @@ class SceneRenderer implements RendererAPI {
   }
 
   /**
-   * Placeholder: the skin id is recorded but nothing is rebuilt yet. The
-   * render skin (themes/*, toon materials, chibi miner) lands separately.
+   * Record the requested skin. The rebuild happens at the top of the next idle
+   * `update`, never here: tearing the block field down mid-dig would lose the
+   * blocks the rules layer has already removed but the sequencer is still
+   * animating. `setState` is deliberately *not* used to re-lay the field — it
+   * would snap the camera.
    */
   setTheme(theme: ThemeId): void {
-    if (theme === this.theme) return;
+    if (theme === this.theme.id) {
+      this.pendingTheme = null;
+      return;
+    }
+    this.pendingTheme = theme;
+  }
+
+  /**
+   * Swap every skin-owned scene resource, preserving the run.
+   *
+   * Kept: run state, targets, hover, miner pose and facing, camera, elapsed
+   * time and the adaptive quality scale. Rebuilt: block field (mesh + outline
+   * shell + decals, disposed together because they share one instanceMatrix),
+   * highlights, miner and particle pool. The lights are reused as objects and
+   * only reparameterised, so no material in the scene has to recompile.
+   */
+  private rebuildSkin(id: ThemeId): void {
+    const theme = this.resolveTheme(id);
+    const minerVisible = this.miner.group.visible;
+    const facing = this.miner.facing;
+    const minerClock = this.miner.clock;
+    const minerStride = this.miner.stride;
+
+    this.particles.clear();
+    this.shake.reset();
+    this.dom.clear();
+    this.miner.group.remove(this.lamp);
+    releaseSkin(this.scene, this.skin);
+
     this.theme = theme;
+    this.skin = buildSkin(theme, this.gridWidth);
+    applyLights(theme, { hemi: this.hemi, sun: this.sun, lamp: this.lamp });
+    this.miner.group.add(this.lamp);
+    this.dom.setTheme(theme);
+    attachSkin(this.scene, this.skin);
+
+    this.field.reset(this.gridWidth);
+    this.hitPending = -1;
+    this.hitPendingCell = -1;
+    this.updateAtmosphere();
+    if (this.state) this.field.sync(this.state.grid, Math.max(0, Math.round(this.minerRow)));
+    this.field.pulseGoal(this.time);
+
+    this.miner.setVisible(minerVisible);
+    this.miner.setFacing(facing);
+    this.miner.syncClock(minerClock, minerStride);
+    this.miner.setMotion('idle');
+    this.miner.setPosition(this.minerX, this.minerY);
+    this.highlights.set(this.gridWidth, this.targets, this.hover);
+    this.highlights.setSuppressed(this.playing);
+    this.dom.setLabels(this.targets, this.gridWidth);
+    this.setReducedMotion(this.reducedMotion);
   }
 
   isBusy(): boolean {
@@ -400,11 +477,8 @@ class SceneRenderer implements RendererAPI {
     this.canvas.removeEventListener('webglcontextlost', this.onContextLost);
     this.canvas.removeEventListener('webglcontextrestored', this.onContextRestored);
 
-    this.scene.remove(this.field.mesh, this.highlights.mesh, this.particles.mesh, this.miner.group);
-    this.field.dispose();
-    this.highlights.dispose();
-    this.particles.dispose();
-    this.miner.dispose();
+    this.scene.remove(this.hemi, this.sun);
+    releaseSkin(this.scene, this.skin);
     this.dom.dispose();
     this.renderer.dispose();
     this.state = null;
@@ -655,7 +729,7 @@ class SceneRenderer implements RendererAPI {
       const x = worldX(removal.col, width);
       const y = worldY(removal.row);
       const power = removal.source === 'chain' ? 1.4 : 1;
-      this.tmpColor.setHex(def.color);
+      this.tmpColor.setHex(this.theme.blocks[removal.kind].shade);
       this.particles.burst(x, y, 0.2, this.tmpColor, 8 * power, 2.4 * power, 0.12);
 
       if (removal.cash > 0) {
@@ -708,18 +782,10 @@ class SceneRenderer implements RendererAPI {
   private updateAtmosphere(): void {
     const state = this.state;
     const row = state ? Math.max(0, this.minerRow) : 0;
-    const t = smoothstep(row / DARK_BY_ROW);
-
-    this.bgColor.setHex(SKY_COLOR).lerp(this.deepColor, t);
-    this.fog.color.copy(this.bgColor);
-    // Fog tightens with depth: the walls close in.
-    this.fog.near = this.camDist + 1.5 - 4 * t;
-    this.fog.far = this.camDist + 18 - 11 * t;
-    this.hemi.intensity = 0.95 - 0.65 * t;
-    this.sun.intensity = 1.15 - 0.6 * t;
-    this.lamp.intensity = 1.2 + 4.3 * t;
-    this.dom.setVignette(0.18 + 0.42 * t);
-
+    const t = applyAtmosphere(this.theme, row, this.fit.camDist, this.atmosphere);
+    const air = this.theme.atmosphere;
+    this.dom.setVignette(air.vignetteBase + air.vignetteGain * t);
+    // Overbright exit layer, boosted with depth so it still cuts through fog.
     this.field.setGoal(state ? state.level.targetDepth : -1, 1 + 0.8 * t);
   }
 
@@ -732,12 +798,7 @@ class SceneRenderer implements RendererAPI {
     this.camX = damp(this.camX, this.state ? this.minerX * 0.2 : 0, CAMERA_LERP_K * 0.6, dt);
 
     this.shake.update(dt, !this.reducedMotion, this.shakeOffset);
-    const sx = this.shakeOffset.x;
-    const sy = this.shakeOffset.y;
-    // A translation shared by position and target keeps the framing stable.
-    this.camera.position.set(this.camX + sx, this.camY + this.tiltHeight + sy, this.camDist + this.shakeOffset.z);
-    this.lookTarget.set(this.camX + sx, this.camY + sy, 0);
-    this.camera.lookAt(this.lookTarget);
+    placeCamera(this.camera, this.camX, this.camY, this.fit, this.shakeOffset, this.lookTarget);
   }
 
   private snapCamera(): void {

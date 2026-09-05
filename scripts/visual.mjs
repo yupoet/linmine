@@ -3,7 +3,7 @@
 import { chromium } from '/data/duchess/node_modules/playwright/index.mjs';
 
 const URL = process.env.URL || 'http://127.0.0.1:4173/';
-const OUT = '/tmp/shots';
+const OUT = process.env.OUT || '/tmp/shots';
 import { mkdirSync } from 'node:fs';
 mkdirSync(OUT, { recursive: true });
 
@@ -93,6 +93,20 @@ const state1 = await page.evaluate(() => {
   return run ? { depth: run.depth, dur: run.durability, status: run.status, cash: run.cash } : null;
 });
 console.log('run after digs:', JSON.stringify(state1));
+
+// Draw-call budget: the candy skin may add at most 3 instanced layers plus the
+// miner's outline shells over ember, so log the renderer stats either side of a
+// live skin swap. The rebuild is deferred to the next idle frame, hence the wait.
+const other = THEME === 'ember' ? 'candy' : 'ember';
+const statsBefore = await page.evaluate(() => window.linmine.renderer.stats());
+await page.evaluate((t) => window.linmine.game.handlers.setTheme(t), other);
+await sleep(700);
+const statsAfter = await page.evaluate(() => window.linmine.renderer.stats());
+console.log(`stats [${THEME}]:`, JSON.stringify(statsBefore));
+console.log(`stats [${other}]:`, JSON.stringify(statsAfter));
+await page.evaluate((t) => window.linmine.game.handlers.setTheme(t), THEME);
+await sleep(500);
+await page.screenshot({ path: `${OUT}/07-after-skin-swap.png` });
 
 console.log('CONSOLE ERRORS:', errors.length);
 for (const e of errors.slice(0, 20)) console.log('  -', e);

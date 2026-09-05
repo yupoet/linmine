@@ -1,24 +1,9 @@
-import {
-  BoxGeometry,
-  type BufferGeometry,
-  Group,
-  Mesh,
-  MeshBasicMaterial,
-  MeshLambertMaterial,
-  type Material,
-  SphereGeometry,
-} from 'three';
-import { CUBE_SIZE, PLAYER_Z, feetY, worldX } from './constants.ts';
+import { Group } from 'three';
+import { PLAYER_Z, feetY, worldX } from './constants.ts';
+import { buildParts, type MinerParts, type PartSlot } from './minerParts.ts';
+import type { RenderTheme } from './themes/types.ts';
 
 export type MinerMotion = 'idle' | 'walk' | 'fall';
-
-const SHIRT = 0xe0574a;
-const TROUSERS = 0x2f4a7a;
-const SKIN = 0xf0c193;
-const HELMET = 0xffc93c;
-const LAMP = 0xfff6c8;
-const STEEL = 0x8d949e;
-const WOOD = 0x8a5a3b;
 
 /** One full leg/arm cycle per walked cell (0.1 s) feels right at this scale. */
 const WALK_CYCLE = Math.PI * 2 / 0.1;
@@ -40,13 +25,18 @@ function easeIn(t: number): number {
 }
 
 /**
- * Low-poly miner assembled from boxes, posed entirely by time accumulators.
+ * The miner rig: a hierarchy of pivots posed entirely by time accumulators.
+ *
+ * The shapes hanging off the pivots come from `minerParts.ts` — classic boxes
+ * for ember, chibi spheres and capsules for candy — so this animation code is
+ * identical for every skin, and so are the frames at which the dig sequencer
+ * fires `onWave` / `onLand`.
  *
  * Hierarchy:
  *   group  -> world position of the feet
  *     tilt -> lean into the direction of travel
  *       body   -> squash & stretch (landing, falling)
- *         body / head / helmet / lamp / armL / armR(+pickaxe) / legL / legR
+ *         armL / armR(+pickaxe) / legL / legR, plus the skin's body parts
  *
  * Facing is a yaw flip on the root, so every local pose (lean, swing, limb
  * swing) is written once and mirrors itself.
@@ -59,10 +49,9 @@ export class Miner {
   private readonly armRight = new Group();
   private readonly legLeft = new Group();
   private readonly legRight = new Group();
-  private readonly geometries: BufferGeometry[] = [];
-  private readonly materials: Material[] = [];
+  private readonly parts: MinerParts;
 
-  private facing = 1;
+  private direction = 1;
   private motion: MinerMotion = 'idle';
   private time = 0;
   private walkPhase = 0;
@@ -71,39 +60,57 @@ export class Miner {
   private landT = -1;
   private landStrength = 1;
 
-  constructor() {
+  constructor(theme: RenderTheme) {
     this.group.add(this.tilt);
     this.tilt.add(this.body);
 
-    const torso = this.box(0.4, 0.34, 0.26, SHIRT, 0, 0.39, 0);
-    this.body.add(torso);
-    const hips = this.box(0.36, 0.12, 0.24, TROUSERS, 0, 0.24, 0);
-    this.body.add(hips);
+    this.parts = buildParts(theme.miner.variant, theme);
+    const { armX, armY, legX, legY } = this.parts.pivots;
+    this.armLeft.position.set(-armX, armY, 0);
+    this.armRight.position.set(armX, armY, 0);
+    this.legLeft.position.set(-legX, legY, 0);
+    this.legRight.position.set(legX, legY, 0);
 
-    const head = this.box(0.28, 0.26, 0.26, SKIN, 0, 0.69, 0);
-    this.body.add(head);
-    const helmet = this.box(0.34, 0.13, 0.32, HELMET, 0, 0.86, 0);
-    this.body.add(helmet);
-
-    const lampGeo = new SphereGeometry(0.055, 8, 6);
-    const lampMaterial = new MeshBasicMaterial({ color: LAMP });
-    this.geometries.push(lampGeo);
-    this.materials.push(lampMaterial);
-    const lamp = new Mesh(lampGeo, lampMaterial);
-    lamp.position.set(0, 0.79, 0.15);
-    this.body.add(lamp);
-
-    // Limbs pivot at the shoulder / hip; the mesh hangs below the pivot.
-    this.buildLimb(this.armLeft, -0.25, 0.52, 0.11, 0.3, 0.13, SKIN);
-    this.buildLimb(this.armRight, 0.25, 0.52, 0.11, 0.3, 0.13, SKIN);
-    this.buildLimb(this.legLeft, -0.1, 0.24, 0.13, 0.24, 0.15, TROUSERS);
-    this.buildLimb(this.legRight, 0.1, 0.24, 0.13, 0.24, 0.15, TROUSERS);
+    // Torso before limbs, matching the order the parts are listed in. Sibling
+    // order breaks ties in three.js's opaque sort, so it is part of the look.
+    for (const part of this.parts.parts) if (part.slot === 'body') this.body.add(part.mesh);
     this.body.add(this.armLeft, this.armRight, this.legLeft, this.legRight);
+    for (const part of this.parts.parts) if (part.slot !== 'body') this.groupFor(part.slot).add(part.mesh);
+  }
 
-    // Pickaxe, held in the right hand.
-    const handle = this.box(0.05, 0.46, 0.05, WOOD, 0, -0.34, 0.02);
-    const pickHead = this.box(0.3, 0.09, 0.09, STEEL, 0, -0.56, 0.02);
-    this.armRight.add(handle, pickHead);
+  private groupFor(slot: PartSlot): Group {
+    if (slot === 'armLeft') return this.armLeft;
+    if (slot === 'armRight') return this.armRight;
+    if (slot === 'legLeft') return this.legLeft;
+    if (slot === 'legRight') return this.legRight;
+    return this.body;
+  }
+
+  /** +1 when facing right, -1 when facing left. */
+  get facing(): number {
+    return this.direction;
+  }
+
+  /** Idle-breathing clock, in seconds. */
+  get clock(): number {
+    return this.time;
+  }
+
+  /** Walk cycle phase, in radians. */
+  get stride(): number {
+    return this.walkPhase;
+  }
+
+  /**
+   * Adopt another miner's animation phase.
+   *
+   * A skin swap builds a fresh rig; without this the idle bob and the walk
+   * cycle would restart from zero and the miner would visibly twitch at the
+   * moment the player changes skin.
+   */
+  syncClock(time: number, walkPhase: number): void {
+    this.time = time;
+    this.walkPhase = walkPhase;
   }
 
   setVisible(value: boolean): void {
@@ -123,8 +130,8 @@ export class Miner {
   setFacing(direction: number): void {
     if (direction === 0) return;
     const next = direction > 0 ? 1 : -1;
-    if (next === this.facing) return;
-    this.facing = next;
+    if (next === this.direction) return;
+    this.direction = next;
     this.group.rotation.y = next > 0 ? 0 : Math.PI;
   }
 
@@ -227,33 +234,6 @@ export class Miner {
   }
 
   dispose(): void {
-    for (const geometry of this.geometries) geometry.dispose();
-    for (const material of this.materials) material.dispose();
-    this.geometries.length = 0;
-    this.materials.length = 0;
-  }
-
-  private buildLimb(
-    pivot: Group,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    depth: number,
-    color: number,
-  ): void {
-    pivot.position.set(x, y, 0);
-    const mesh = this.box(width, height, depth, color, 0, -height / 2, 0);
-    pivot.add(mesh);
-  }
-
-  private box(width: number, height: number, depth: number, color: number, x: number, y: number, z: number): Mesh {
-    const geometry = new BoxGeometry(width * CUBE_SIZE, height * CUBE_SIZE, depth * CUBE_SIZE);
-    const material = new MeshLambertMaterial({ color });
-    this.geometries.push(geometry);
-    this.materials.push(material);
-    const mesh = new Mesh(geometry, material);
-    mesh.position.set(x, y, z);
-    return mesh;
+    this.parts.dispose();
   }
 }

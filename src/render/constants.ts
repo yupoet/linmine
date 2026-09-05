@@ -57,11 +57,7 @@ export const DIG_BUDGET = 0.75;
 export const WAVE_GAP = 0.04;
 
 // --- atmosphere --------------------------------------------------------------
-
-export const SKY_COLOR = 0x9ad9f5;
-export const DEEP_COLOR = 0x05070c;
-/** Row at which the atmosphere has fully transitioned to the deep palette. */
-export const DARK_BY_ROW = 40;
+// Sky / deep / darkByRow now live on the active RenderTheme (render/themes/*).
 
 export const MAX_SHAKE = 0.22;
 export const PARTICLE_GRAVITY = 9.5;
