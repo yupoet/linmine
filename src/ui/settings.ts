@@ -138,7 +138,7 @@ export function createSettings(handlers: {
 
   const version = h('p', 'settings__version');
 
-  const back = h('button', 'iconbtn', [svg('back', 'icon')]);
+  const back = h('button', 'iconbtn iconbtn--close', [svg('back', 'icon')]);
   back.type = 'button';
   back.setAttribute('aria-label', t('Back to title'));
   back.addEventListener('click', () => handlers.goToTitle());

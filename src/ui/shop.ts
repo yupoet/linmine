@@ -57,7 +57,7 @@ export function createShop(
 
   const cashValue = new Counter({ reducedMotion });
 
-  const back = h('button', 'iconbtn', [svg('back', 'icon')]);
+  const back = h('button', 'iconbtn iconbtn--close', [svg('back', 'icon')]);
   back.type = 'button';
   back.setAttribute('aria-label', t('Back to levels'));
   back.addEventListener('click', () => handlers.goToLevels());
