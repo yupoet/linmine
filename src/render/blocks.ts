@@ -94,6 +94,8 @@ export class BlockField {
     this.top = 0;
     this.bottom = -1;
     this.dirty = true;
+    this.hitCell = -1;
+    this.hitSlot = -1;
   }
 
   /** Keep a cell rendered even though the grid already reports it as empty. */
@@ -112,6 +114,74 @@ export class BlockField {
   setGoal(row: number, boost: number): void {
     this.goalRow = row;
     this.goalBoost = boost;
+  }
+
+  // --- hit flash -------------------------------------------------------------
+  // A tapped block shakes and whitens for ~100ms before its wave destroys it,
+  // giving the impact a readable "hit" beat instead of an instant vanish.
+
+  private hitCell = -1;
+  private hitSlot = -1;
+  private hitT = 0;
+  private readonly hitBaseColor = new Color();
+
+  /** Start the hit reaction on a cell (ignored when not on screen). */
+  hit(cellIndex: number): void {
+    const slot = this.slotOfCell.get(cellIndex);
+    if (slot === undefined || slot >= this.mesh.count) return;
+    this.clearHit();
+    this.hitCell = cellIndex;
+    this.hitSlot = slot;
+    this.hitT = 0;
+    this.hitBaseColor.copy(this.mesh.getColorAt(slot, this.color) ?? this.color);
+  }
+
+  private clearHit(): void {
+    if (this.hitSlot < 0) return;
+    if (this.hitSlot < this.mesh.count) {
+      const cell = this.cellOfSlot[this.hitSlot];
+      const row = (cell / this.width) | 0;
+      const col = cell - row * this.width;
+      this.mesh.setColorAt(this.hitSlot, this.blockColor(col, row, this.kindOfSlot[this.hitSlot], this.variantOfSlot[this.hitSlot]));
+    }
+    this.hitCell = -1;
+    this.hitSlot = -1;
+    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+  }
+
+  /** Advance the hit reaction; call every frame. */
+  updateHit(dt: number, reduced: boolean): void {
+    if (this.hitSlot < 0) return;
+    this.hitT += dt;
+    const DURATION = 0.1;
+    if (this.hitT >= DURATION || this.hitSlot >= this.mesh.count || this.cellOfSlot[this.hitSlot] !== this.hitCell) {
+      this.clearHit();
+      return;
+    }
+    // The slot may have been swapped by a concurrent rebuild.
+    const slot = this.slotOfCell.get(this.hitCell);
+    if (slot === undefined) {
+      this.clearHit();
+      return;
+    }
+    this.hitSlot = slot;
+    const cell = this.cellOfSlot[slot];
+    const row = (cell / this.width) | 0;
+    const col = cell - row * this.width;
+    const k = this.hitT / DURATION;
+    const flash = 1 - k;
+    // White flash layered over the base colour, plus a shrinking jitter.
+    this.color.copy(this.hitBaseColor).lerp(this.mix.setHex(0xffffff), flash * 0.7);
+    this.mesh.setColorAt(slot, this.color);
+    const shake = reduced ? 0 : 0.06 * (1 - k);
+    const jx = worldX(col, this.width) + (Math.sin(this.hitT * 260) * shake);
+    const jy = worldY(row) + (Math.cos(this.hitT * 310) * shake);
+    const squash = 1 - 0.12 * k;
+    this.matrix.makeScale(squash, 1 / squash, squash);
+    this.matrix.setPosition(jx, jy, 0);
+    this.mesh.setMatrixAt(slot, this.matrix);
+    this.mesh.instanceMatrix.needsUpdate = true;
+    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
   }
 
   /** Force a full rebuild and re-upload (after a WebGL context restore). */
@@ -199,6 +269,10 @@ export class BlockField {
   private removeAt(slot: number): void {
     const removed = this.cellOfSlot[slot];
     this.slotOfCell.delete(removed);
+    if (removed === this.hitCell) {
+      this.hitCell = -1;
+      this.hitSlot = -1;
+    }
     const last = this.mesh.count - 1;
     if (slot !== last) {
       const moved = this.cellOfSlot[last];

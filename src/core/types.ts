@@ -19,6 +19,8 @@ export interface RunModifiers {
   startDurability: number;
   /** Durability subtracted from soil/rock costs. */
   softCostDelta: number;
+  /** Durability subtracted from ore costs (Rich Veins floor). */
+  oreCostDelta: number;
   /** Additive ore cash bonus (0.2 => +20%). */
   oreCashMul: number;
   /** Additive bonus applied to chain destruction only. */

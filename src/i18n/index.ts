@@ -61,21 +61,22 @@ export function tCardDesc(card: CardDef, level: number): string {
   if (currentLang === 'en') return card.describe(level);
   switch (card.id) {
     case 'rich_veins':
-      return `矿石出现频率提高 ${pct(0.18 * level)}。`;
+      return `矿石出现频率提高 ${pct(0.18 * level)}，且开采耐久 -1。`;
     case 'loaded_crates':
       return `特殊方块出现频率提高 ${pct(0.25 * level)}。`;
     case 'appraiser':
       return `矿石售出价格提高 ${pct(0.2 * level)}。`;
     case 'deep_pockets':
-      return `每深入 10 行，深度加成提高 ${pct(0.1 * level)}。`;
+      return `每深入 10 行，深度加成提高 ${pct(0.06 * level)}。`;
     case 'sturdy_grip':
       return `每局初始耐久 +${6 + 4 * (level - 1)}。`;
     case 'soft_soil':
       return `挖土与岩石的耐久消耗降低 ${(1 + 0.25 * (level - 1)).toFixed(2)}。`;
     case 'big_blast':
       return `爆裂箱的波及半径扩大至 ${Math.min(3, Math.floor(1 + 0.5 * (level - 1)))} 格。`;
+    // (rich_veins 保底：矿石耐久 -1，文案已并入上一条)
     case 'chain_bonus':
-      return `连锁破坏的收益提高 ${pct(0.6 * level)}。`;
+      return `连锁破坏的收益提高 ${pct(0.35 * level)}。`;
     default:
       return card.describe(level);
   }

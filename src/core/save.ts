@@ -123,6 +123,25 @@ export function sanitizeProfile(raw: unknown): Profile {
         bestCash: num(entry.bestCash, 0),
       };
     }
+    // Daily shafts (daily_YYYYMMDD) are player records too — keep any that
+    // look sane instead of silently dropping them on load.
+    for (const [id, entry] of Object.entries(raw.levels)) {
+      if (!id.startsWith('daily_') || !isRecord(entry)) continue;
+      if (typeof profile.levels[id]?.plays === 'number' && profile.levels[id]) {
+        const existing = profile.levels[id];
+        existing.plays = Math.max(existing.plays, num(entry.plays, 0));
+        existing.clears = Math.max(existing.clears, num(entry.clears, 0));
+        existing.bestDepth = Math.max(existing.bestDepth, num(entry.bestDepth, 0));
+        existing.bestCash = Math.max(existing.bestCash, num(entry.bestCash, 0));
+      } else {
+        profile.levels[id] = {
+          plays: num(entry.plays, 0),
+          clears: num(entry.clears, 0),
+          bestDepth: num(entry.bestDepth, 0),
+          bestCash: num(entry.bestCash, 0),
+        };
+      }
+    }
   }
 
   if (Array.isArray(raw.pendingChests)) {

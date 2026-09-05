@@ -144,6 +144,14 @@ export interface RendererOptions {
   canvas: HTMLCanvasElement;
   /** Grid columns; comes from the level config. */
   width: number;
+  /**
+   * Fired exactly when a destruction wave hits on screen, so audio plays at
+   * the real impact moment instead of a wall-clock estimate. `wave` 0 is the
+   * tapped block; later waves are chain cascades.
+   */
+  onWave?: (wave: number, destroyed: number, kind: number, chained: boolean) => void;
+  /** Fired when the miner lands after a fall (fallRows may be 0). */
+  onLand?: (fallRows: number) => void;
 }
 
 /**

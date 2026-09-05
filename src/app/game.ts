@@ -27,7 +27,7 @@ import {
   type ChestTier,
 } from '../config/economy.ts';
 import { CARDS, cardById, MAX_CARDS_PER_RUN } from '../config/cards.ts';
-import { LEVELS, levelById } from '../config/levels.ts';
+import { LEVELS, levelById, dailyLevel, isDailyId } from '../config/levels.ts';
 import { CONFIG_VERSION } from '../config/version.ts';
 import { BlockKind } from '../config/blocks.ts';
 import type {
@@ -57,7 +57,7 @@ import {
 import type { AnalyticsAPI } from './analytics.ts';
 import type { AudioAPI } from '../platform/audio.ts';
 import type { StorageAPI } from '../platform/storage.ts';
-import type { Cell, DigResult, RunState } from '../core/types.ts';
+import type { Cell, RunState } from '../core/types.ts';
 import { gameName, setLang as setI18nLang, t, tCardDesc, tChest, type Lang } from '../i18n/index.ts';
 
 export interface GameDeps {
@@ -81,6 +81,8 @@ export interface GameAPI {
   frame(dt: number): void;
   tapAt(clientX: number, clientY: number): void;
   hoverAt(clientX: number, clientY: number): void;
+  digWaveSound(wave: number, destroyed: number, kind: number, chained: boolean): void;
+  digLandSound(fallRows: number): void;
   handlers: UIHandlers;
   getProfile(): Profile;
   getRun(): RunState | null;
@@ -138,7 +140,7 @@ export function createGame(deps: GameDeps): GameAPI {
   }
 
   function levelViews(): LevelView[] {
-    return LEVELS.map((level) => {
+    const story = LEVELS.map((level) => {
       const record = profile.levels[level.id];
       return {
         id: level.id,
@@ -152,6 +154,21 @@ export function createGame(deps: GameDeps): GameAPI {
         clears: record?.clears ?? 0,
       };
     });
+    // Today's daily shaft rides at the top of the list.
+    const daily = dailyLevel();
+    const record = profile.levels[daily.id];
+    story.unshift({
+      id: daily.id,
+      name: t(daily.name),
+      blurb: t(daily.blurb),
+      targetDepth: daily.targetDepth,
+      unlocked: true,
+      cleared: (record?.clears ?? 0) > 0,
+      bestDepth: record?.bestDepth ?? 0,
+      plays: record?.plays ?? 0,
+      clears: record?.clears ?? 0,
+    });
+    return story;
   }
 
   function hudView(): HudView {
@@ -327,63 +344,32 @@ export function createGame(deps: GameDeps): GameAPI {
     }
   }
 
-  function estimatedImpactDelay(result: DigResult): number {
-    const walk = result.steps.length * 110;
-    return walk + 160;
+  // --- event-driven dig audio -------------------------------------------------
+  // The renderer fires onWave/onLand exactly when destruction lands on screen,
+  // so audio and haptics are sample-accurate to the animation instead of the
+  // old wall-clock estimate (which drifted up to 0.6s on long walks).
+  function digWaveSound(wave: number, destroyed: number, kind: number, _chained: boolean): void {
+    if (wave === 0) {
+      // Pitch tracks the tapped block's hardness: stone thuds, dirt scrapes.
+      const intensity =
+        kind === BlockKind.Stone ? 0.7 : kind === BlockKind.Gold ? 0.85 : kind === BlockKind.Copper ? 0.6 : 0.4;
+      audio.play('dig', intensity);
+      vibrate(10);
+      return;
+    }
+    audio.play('explode', Math.min(1, 0.4 + wave * 0.18));
+    vibrate(Math.min(60, 18 + wave * 7));
+    if (wave >= 2 && destroyed >= 3) {
+      audio.play('cash', Math.min(1, destroyed / 12));
+    }
   }
 
-  function playSoundsFor(result: DigResult): void {
-    const impact = estimatedImpactDelay(result);
-    const terrainBlock = result.removed.find((entry) => entry.source === 'dig');
-    const oreInChain = result.removed.some(
-      (entry) => entry.source === 'chain' && (entry.kind === BlockKind.Gold || entry.kind === BlockKind.Copper),
-    );
-
-    // Initial impact: pitch tracks the tapped block's hardness so stone reads
-    // as a thud and dirt as a soft scrape, without burning an extra voice.
-    const initialIntensity = terrainBlock
-      ? terrainBlock.kind === BlockKind.Stone
-        ? 0.7
-        : terrainBlock.kind === BlockKind.Gold
-          ? 0.85
-          : 0.4
-      : 0.6;
+  function digLandSound(fallRows: number): void {
+    audio.play('fall', Math.min(1, fallRows / 12));
     setTimeout(() => {
-      audio.play(terrainBlock ? 'dig' : 'break', initialIntensity);
-    }, impact);
-
-    const chainBlocks = result.removed.filter((entry) => entry.source === 'chain');
-    if (chainBlocks.length > 0) {
-      const waves = Math.max(...chainBlocks.map((entry) => entry.wave));
-      for (let wave = 1; wave <= waves; wave++) {
-        const waveIntensity = Math.min(1, 0.4 + wave * 0.18);
-        setTimeout(() => {
-          audio.play('explode', waveIntensity);
-          vibrate(Math.min(60, 18 + wave * 7));
-        }, impact + 90 + wave * 90);
-      }
-      setTimeout(() => {
-        audio.play('cash', Math.min(1, chainBlocks.length / 12));
-        if (chainBlocks.length >= 6) {
-          // Triumphant overtone for big payouts.
-          setTimeout(() => audio.play('cash', 1), 60);
-          setTimeout(() => audio.play('cash', 0.9), 130);
-          if (oreInChain) setTimeout(() => audio.play('chest', 0.5), 200);
-        }
-      }, impact + 120 + waves * 90);
-    }
-
-    if (result.durabilityRepaired > 0) {
-      setTimeout(() => audio.play('repair'), impact + 60);
-    }
-
-    if (result.fellDistance >= 2) {
-      setTimeout(() => audio.play('fall', Math.min(1, result.fellDistance / 12)), impact + 120);
-      setTimeout(() => {
-        audio.play('land');
-        vibrate(30);
-      }, impact + 120 + Math.min(450, result.fellDistance * 50));
-    }
+      audio.play('land');
+      vibrate(30);
+    }, Math.min(450, fallRows * 50));
   }
 
   function dig(col: number, row: number): void {
@@ -436,9 +422,15 @@ export function createGame(deps: GameDeps): GameAPI {
     if (cleared >= 6) {
       banner = t('CHAIN x{n}!', { n: cleared });
       bannerTimer = 1.4;
+    } else if (cleared >= 3) {
+      // Small chains get a lighter beat so 2-5 block pops still feel scored.
+      banner = t('CHAIN x{n}!', { n: cleared });
+      bannerTimer = 0.8;
     }
 
-    playSoundsFor(result);
+    // Audio now rides renderer events (onWave/onLand) for sample-accurate
+    // sync; repair chimes still fire once, right after the first impact.
+    if (result.durabilityRepaired > 0) setTimeout(() => audio.play('repair'), 220);
     renderer.playDig(result, run);
     pushHud();
 
@@ -482,6 +474,7 @@ export function createGame(deps: GameDeps): GameAPI {
     });
 
     const previousClears = profile.levels[state.level.id]?.clears ?? 0;
+    const flawless = state.durability > state.maxDurability * 0.5;
     const outcome = recordRunResult(profile, {
       levelId: state.level.id,
       won,
@@ -489,6 +482,7 @@ export function createGame(deps: GameDeps): GameAPI {
       cashCollected: state.cash,
       stats: state.stats,
       total: settlement.total,
+      flawless,
     });
 
     if (outcome.rewardTier) profile.pendingChests.push(outcome.rewardTier);
@@ -579,7 +573,7 @@ export function createGame(deps: GameDeps): GameAPI {
     },
     selectLevel(levelId: string): void {
       audio.play('ui');
-      if (!isLevelUnlocked(profile, levelById(levelId).index)) {
+      if (!isDailyId(levelId) && !isLevelUnlocked(profile, levelById(levelId).index)) {
         ui.toast(t('Clear the previous dig first'));
         return;
       }
@@ -618,7 +612,8 @@ export function createGame(deps: GameDeps): GameAPI {
     },
     claimResult(): void {
       audio.play('ui');
-      if (pendingResult?.rewardTier) profile.pendingChests.push(pendingResult.rewardTier);
+      // The reward chest was already granted when the run settled (buildResult
+      // pushes it exactly once); claiming only discards the pending board.
       pendingResult = null;
       save();
       if (draftLevelId) goToDraft(draftLevelId);
@@ -824,6 +819,8 @@ export function createGame(deps: GameDeps): GameAPI {
     getProfile: () => profile,
     getRun: () => run,
     digCell,
+    digWaveSound,
+    digLandSound,
   };
 
   /** Drive a real dig through the app path — used by automation/iteration bots. */

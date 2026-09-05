@@ -50,7 +50,7 @@ describe('chains', () => {
     const wide = makeRun({
       rows: ['@.....', 'dBdddd', 'dddddd', 'dddddd'],
       durability: 20,
-      cards: [{ id: 'big_blast', level: 1 }],
+      cards: [{ id: 'big_blast', level: 3 }],
       floor: true,
     });
     const narrowResult = applyDig(narrow, 1, 1);
@@ -89,7 +89,7 @@ describe('chains', () => {
     const boosted = makeRun({
       rows: ['@.....', 'dBdccc', 'dddddd'],
       durability: 20,
-      cards: [{ id: 'chain_bonus', level: 1 }],
+      cards: [{ id: 'chain_bonus', level: 5 }],
       floor: true,
     });
     const plainCash = applyDig(plain, 1, 1).cashGained;

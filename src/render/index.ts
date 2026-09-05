@@ -63,6 +63,8 @@ function clamp(value: number, min: number, max: number): number {
 class SceneRenderer implements RendererAPI {
   private readonly canvas: HTMLCanvasElement;
   private readonly renderer: WebGLRenderer;
+  private readonly onWave: NonNullable<RendererOptions['onWave']>;
+  private readonly onLand: NonNullable<RendererOptions['onLand']>;
   private readonly scene = new Scene();
   private readonly camera = new PerspectiveCamera(CAMERA_FOV, 1, 0.1, 200);
   private readonly bgColor = new Color(SKY_COLOR);
@@ -147,6 +149,8 @@ class SceneRenderer implements RendererAPI {
   constructor(options: RendererOptions) {
     this.canvas = options.canvas;
     this.gridWidth = options.width;
+    this.onWave = options.onWave ?? (() => undefined);
+    this.onLand = options.onLand ?? (() => undefined);
 
     this.renderer = new WebGLRenderer({
       canvas: this.canvas,
@@ -267,6 +271,7 @@ class SceneRenderer implements RendererAPI {
     this.advanceDig(step);
     this.miner.update(step);
     this.particles.update(step);
+    this.field.updateHit(step, this.reducedMotion);
 
     this.updateAtmosphere();
     this.field.pulseGoal(this.time);
@@ -397,6 +402,9 @@ class SceneRenderer implements RendererAPI {
 
   // --- dig sequencer --------------------------------------------------------
 
+  private hitPending = -1;
+  private hitPendingCell = -1;
+
   /**
    * Lays out the whole tap as absolute times and then compresses the flexible
    * parts (walk, swing, chain stagger) so a tap never exceeds DIG_BUDGET.
@@ -508,6 +516,8 @@ class SceneRenderer implements RendererAPI {
     this.segIndex = 0;
     this.swingStarted = false;
     this.landed = false;
+    this.hitPending = Math.max(0, impactAt - 0.1);
+    this.hitPendingCell = state.grid.index(target.col, target.row);
     this.playing = true;
     this.highlights.setSuppressed(true);
     this.dom.setLabelsVisible(false);
@@ -534,6 +544,12 @@ class SceneRenderer implements RendererAPI {
 
     this.elapsed += dt;
     const e = this.elapsed;
+
+    // Hit flash: the tapped block reacts shortly before the impact lands.
+    if (this.hitPending >= 0 && e >= this.hitPending) {
+      this.field.hit(this.hitPendingCell);
+      this.hitPending = -1;
+    }
 
     for (let w = 0; w < this.waveCount; w++) {
       if (this.waveDone[w] === 0 && e >= this.waveAt[w]) {
@@ -619,6 +635,7 @@ class SceneRenderer implements RendererAPI {
     if (list.length === 0) return;
     const width = state.grid.width;
     let destroyed = 0;
+    let firstKind = list[0].kind;
 
     for (let i = 0; i < list.length; i++) {
       const removal = list[i];
@@ -638,6 +655,9 @@ class SceneRenderer implements RendererAPI {
       destroyed++;
     }
 
+    // Audio/haptics fire at the true on-screen impact moment.
+    this.onWave(wave, destroyed, firstKind, wave > 0);
+
     if (destroyed > 0) {
       // Later waves hit harder: a chain should build like a firework.
       this.shake.add(Math.min(0.55, 0.09 + destroyed * 0.045) * (wave === 0 ? 1 : 1.25));
@@ -649,6 +669,7 @@ class SceneRenderer implements RendererAPI {
     this.miner.squash(strength);
     this.particles.dust(this.targetX, this.minerY - 0.05, 0.3, strength);
     if (!this.reducedMotion) this.shake.add(Math.min(0.3, 0.04 + this.fallRows * 0.03));
+    if (this.fallRows >= 2) this.onLand(this.fallRows);
   }
 
   private finishDig(state: RunState): void {

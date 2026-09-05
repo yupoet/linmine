@@ -12,6 +12,7 @@ export type ModifierKey =
   | 'specialWeightMul'
   | 'startDurability'
   | 'softCostDelta'
+  | 'oreCostDelta'
   | 'oreCashMul'
   | 'depthCashPer10'
   | 'bombRadiusBonus'
@@ -46,8 +47,13 @@ export const CARDS: readonly CardDef[] = [
     family: 'generation',
     maxLevel: 5,
     drawWeight: 10,
-    effects: [{ key: 'oreWeightMul', value: 0.18, perLevel: 0.18 }],
-    describe: (level) => `Ore appears ${pct(0.18 * level)} more often.`,
+    // The ore-cost floor (-1 at every level) keeps this from being a trap
+    // card: more ore no longer means a faster-broken pick.
+    effects: [
+      { key: 'oreWeightMul', value: 0.18, perLevel: 0.18 },
+      { key: 'oreCostDelta', value: 1, perLevel: 0 },
+    ],
+    describe: (level) => `Ore appears ${pct(0.18 * level)} more often and costs 1 less durability.`,
   },
   {
     id: 'loaded_crates',
@@ -55,8 +61,9 @@ export const CARDS: readonly CardDef[] = [
     family: 'generation',
     maxLevel: 5,
     drawWeight: 9,
-    effects: [{ key: 'specialWeightMul', value: 0.25, perLevel: 0.25 }],
-    describe: (level) => `Special blocks appear ${pct(0.25 * level)} more often.`,
+    // Diminishing returns: 25% / 43% / 56% / 65% / 71% instead of linear 25→125%.
+    effects: [{ key: 'specialWeightMul', value: 0.25, perLevel: 0.18 }],
+    describe: (level) => `Special blocks appear ${pct(weighted(0.25, 0.18, level))} more often.`,
   },
   {
     id: 'appraiser',
@@ -73,8 +80,10 @@ export const CARDS: readonly CardDef[] = [
     family: 'income',
     maxLevel: 5,
     drawWeight: 8,
-    effects: [{ key: 'depthCashPer10', value: 0.1, perLevel: 0.1 }],
-    describe: (level) => `Depth bonus grows by ${pct(0.1 * level)} per 10 rows.`,
+    // Tamed from +10%/level: the old slope let a maxed card triple the depth
+    // bonus curve and blow the economy open.
+    effects: [{ key: 'depthCashPer10', value: 0.06, perLevel: 0.06 }],
+    describe: (level) => `Depth bonus grows by ${pct(0.06 * level)} per 10 rows.`,
   },
   {
     id: 'sturdy_grip',
@@ -100,7 +109,9 @@ export const CARDS: readonly CardDef[] = [
     family: 'chain',
     maxLevel: 5,
     drawWeight: 8,
-    effects: [{ key: 'bombRadiusBonus', value: 1, perLevel: 0.5 }],
+    // Radius now ramps 1/1/2/2/3 (was +1/level): the old linear growth made a
+    // maxed Big Blast a dominant single-card win condition.
+    effects: [{ key: 'bombRadiusBonus', value: 0, perLevel: 0.5 }],
     describe: (level) => `Blast crates clear radius ${Math.min(3, Math.floor(1 + 0.5 * (level - 1)))}.`,
   },
   {
@@ -109,10 +120,25 @@ export const CARDS: readonly CardDef[] = [
     family: 'chain',
     maxLevel: 5,
     drawWeight: 8,
-    effects: [{ key: 'chainCashMul', value: 0.6, perLevel: 0.6 }],
-    describe: (level) => `Chained destruction pays ${pct(0.6 * level)} more.`,
+    // Halved from +60%/level: chain cash compounds with waves, so the old
+    // slope produced 13x baseline payouts on a maxed blast build.
+    effects: [{ key: 'chainCashMul', value: 0.35, perLevel: 0.35 }],
+    describe: (level) => `Chained destruction pays ${pct(0.35 * level)} more.`,
   },
 ];
+
+/** Diminishing-returns sum used by Loaded Crates: v + p*(l-1) but sublinear. */
+function weighted(value: number, perLevel: number, level: number): number {
+  const clamped = Math.max(1, Math.min(level, 5));
+  const growth = perLevel * (clamped - 1) * (1 - 0.12 * (clamped - 1));
+  return Math.max(0, value + growth);
+}
+
+export function effectValue(effect: CardEffect, level: number): number {
+  const clamped = Math.max(1, Math.min(level, 5));
+  if (effect.key === 'specialWeightMul') return weighted(effect.value, effect.perLevel, clamped);
+  return effect.value + effect.perLevel * (clamped - 1);
+}
 
 export const MAX_CARDS_PER_RUN = 3;
 
@@ -120,10 +146,4 @@ export function cardById(id: string): CardDef {
   const found = CARDS.find((card) => card.id === id);
   if (!found) throw new Error(`unknown card: ${id}`);
   return found;
-}
-
-/** Effect magnitude at a given card level. */
-export function effectValue(effect: CardEffect, level: number): number {
-  const clamped = Math.max(1, Math.min(level, 5));
-  return effect.value + effect.perLevel * (clamped - 1);
 }

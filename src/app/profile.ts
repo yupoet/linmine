@@ -7,7 +7,7 @@
 
 import { CARDS, cardById, type CardDef } from '../config/cards.ts';
 import { CHESTS, PICKAXE_MAX_LEVEL, pickaxeUpgradeCost, type ChestTier } from '../config/economy.ts';
-import { LEVELS, levelById } from '../config/levels.ts';
+import { LEVELS, levelById, isDailyId } from '../config/levels.ts';
 import { nextInt, nextRange, nextWeighted, type RngState } from '../core/rng.ts';
 import type { Profile } from '../core/save.ts';
 import type { RunStats } from '../core/types.ts';
@@ -39,7 +39,11 @@ export function drawCard(profile: Profile, rng: RngState): ChestCardResult {
   const pool = eligibleCards(profile);
   const index = nextWeighted(rng, pool.map((card) => card.drawWeight));
   const card: CardDef = pool[index >= 0 ? index : 0];
+  return grantCard(profile, card);
+}
 
+/** Grant one copy of a specific card (shared by chest pulls and level bumps). */
+function grantCard(profile: Profile, card: CardDef): ChestCardResult {
   const owned = profile.cards[card.id];
   const maxed = (owned?.level ?? 0) >= card.maxLevel;
 
@@ -59,13 +63,43 @@ export function drawCard(profile: Profile, rng: RngState): ChestCardResult {
   };
 }
 
+/**
+ * Tier-gated pulls so the three crates are no longer the same box at three
+ * prices (the Kimi review's "pricing inversion" finding):
+ *  - common: single random card, business as usual;
+ *  - rare:   one guaranteed NEW card (never a duplicate refund);
+ *  - epic:   one guaranteed new card AND one pull that jumps 2 levels.
+ */
+function drawCardForTier(profile: Profile, rng: RngState, tier: ChestTier, slot: number): ChestCardResult {
+  if (tier === 'epic' && slot === 1) {
+    // Epic second slot: a level-jump pull — grant 2 copies of a new-ish card.
+    const open = eligibleCards(profile);
+    const index = nextWeighted(rng, open.map((card) => card.drawWeight));
+    const card = open[index >= 0 ? index : 0];
+    const first = grantCard(profile, card);
+    if (!first.duplicates) {
+      const second = grantCard(profile, card);
+      return second.duplicates ? first : second;
+    }
+    return first;
+  }
+  if (tier === 'rare' || tier === 'epic') {
+    // Guaranteed-new first slot: no duplicate-refund filler in paid crates.
+    const open = eligibleCards(profile);
+    const index = nextWeighted(rng, open.map((card) => card.drawWeight));
+    const card = open[index >= 0 ? index : 0];
+    return grantCard(profile, card);
+  }
+  return drawCard(profile, rng);
+}
+
 export function openChest(profile: Profile, tier: ChestTier, rng: RngState): ChestReward {
   const def = CHESTS[tier];
   const cards: ChestCardResult[] = [];
   let cash = nextRange(rng, def.cashMin, def.cashMax);
 
   for (let i = 0; i < def.cards; i++) {
-    const result = drawCard(profile, rng);
+    const result = drawCardForTier(profile, rng, tier, i);
     cards.push(result);
     cash += result.refund;
   }
@@ -108,6 +142,8 @@ export interface RunResultInput {
   cashCollected: number;
   stats: RunStats;
   total: number;
+  /** Won with more than half the durability remaining. */
+  flawless: boolean;
 }
 
 export interface RunResultOutcome {
@@ -120,6 +156,7 @@ export interface RunResultOutcome {
 /** Commit a finished run to the profile. Returns what changed for the UI. */
 export function recordRunResult(profile: Profile, input: RunResultInput): RunResultOutcome {
   const level = levelById(input.levelId);
+  const isDaily = isDailyId(level.id);
   const record = profile.levels[level.id] ?? { plays: 0, clears: 0, bestDepth: 0, bestCash: 0 };
 
   record.plays += 1;
@@ -140,20 +177,35 @@ export function recordRunResult(profile: Profile, input: RunResultInput): RunRes
     record.clears += 1;
     if (record.clears === 1) {
       firstClear = true;
-      const next = LEVELS[level.index + 1];
-      if (next && (profile.levels[next.id]?.clears ?? 0) === 0 && !profile.pendingChests.length && next.index === level.index + 1) {
-        unlockedLevelId = next.id;
+      // Daily shafts never gate story progression: their index is 0, so a
+      // daily first clear must not "unlock" Copper Gorge.
+      if (!isDaily) {
+        const next = LEVELS[level.index + 1];
+        if (next && (profile.levels[next.id]?.clears ?? 0) === 0 && !profile.pendingChests.length && next.index === level.index + 1) {
+          unlockedLevelId = next.id;
+        }
       }
     }
   }
 
   profile.levels[level.id] = record;
 
+  // Flawless (won with over half the durability left) pays a tier up.
+  const rewardTier = input.won
+    ? firstClear
+      ? input.flawless
+        ? 'epic'
+        : 'rare'
+      : input.flawless
+        ? 'rare'
+        : 'common'
+    : null;
+
   return {
     firstClear,
     unlockedLevelId,
     unlockedLevelName: unlockedLevelId ? levelById(unlockedLevelId).name : null,
-    rewardTier: input.won ? (firstClear ? 'rare' : 'common') : null,
+    rewardTier,
   };
 }
 

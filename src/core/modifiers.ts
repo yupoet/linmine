@@ -18,6 +18,7 @@ export function baseModifiers(): RunModifiers {
   return {
     startDurability: 0,
     softCostDelta: 0,
+    oreCostDelta: 0,
     oreCashMul: 0,
     chainCashMul: 0,
     depthCashPer10: 0,
@@ -58,6 +59,8 @@ export function blockCost(kind: BlockKind, mods: RunModifiers): number {
   let cost = def.cost;
   if (kind === BlockKind.Dirt || kind === BlockKind.Stone) {
     cost -= mods.softCostDelta;
+  } else if (def.isOre) {
+    cost -= mods.oreCostDelta;
   }
   return Math.max(MIN_BLOCK_COST, Math.round(cost));
 }

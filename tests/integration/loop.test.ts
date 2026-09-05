@@ -146,9 +146,12 @@ describe('app loop', () => {
     const { recorder, ui } = setup();
     ui.goToLevels();
     expect(recorder.screens.at(-1)).toBe('levels');
-    expect(recorder.levels).toHaveLength(LEVELS.length);
+    // Daily shaft rides at the top of the list, so one more than the story ladder.
+    expect(recorder.levels).toHaveLength(LEVELS.length + 1);
+    expect(recorder.levels[0]?.id.startsWith('daily_')).toBe(true);
     expect(recorder.levels[0].unlocked).toBe(true);
-    expect(recorder.levels[1].unlocked).toBe(false);
+    expect(recorder.levels[1].unlocked).toBe(true);
+    expect(recorder.levels[2].unlocked).toBe(false);
 
     ui.selectLevel(LEVELS[0].id);
     expect(recorder.screens.at(-1)).toBe('draft');
@@ -211,7 +214,8 @@ describe('app loop', () => {
     expect(recorder.result?.settlement.winBonus).toBeGreaterThan(0);
     expect(game.getProfile().cash).toBe(recorder.result?.settlement.total);
     expect(game.getProfile().levels[LEVELS[0].id].clears).toBe(1);
-    expect(game.getProfile().pendingChests).toContain('rare');
+    // First clear while flawless (>50% durability left) pays the epic cache.
+    expect(game.getProfile().pendingChests).toContain('epic');
   });
 
   it('unlocks the next level after the first clear', () => {

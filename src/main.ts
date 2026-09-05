@@ -39,11 +39,19 @@ function main(): void {
   const analytics = createAnalytics();
   const clock = createClock();
 
-  const renderer = createRenderer({ canvas, width: DEFAULT_GRID_WIDTH });
+  // Dig audio is event-driven: the renderer reports the exact on-screen
+  // impact moment, which the game turns into sound/haptics. The bridge is
+  // late-bound because the game does not exist yet.
+  let game: GameAPI | null = null;
+  const renderer = createRenderer({
+    canvas,
+    width: DEFAULT_GRID_WIDTH,
+    onWave: (wave, destroyed, kind, chained) => game?.digWaveSound(wave, destroyed, kind, chained),
+    onLand: (fallRows) => game?.digLandSound(fallRows),
+  });
   renderer.resize();
 
   // The UI is built before the game exists, so its handler calls are late-bound.
-  let game: GameAPI | null = null;
   const lateBound = new Proxy({} as UIHandlers, {
     get(_target, key: string) {
       return (...args: unknown[]) => {

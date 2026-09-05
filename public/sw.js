@@ -50,14 +50,21 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
+  // Strip query strings when matching: the manifest start_url carries
+  // ?source=pwa and would otherwise miss the cached shell and break offline.
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE);
-      const cached = await cache.match(req, { ignoreSearch: false });
+      const cached =
+        (await cache.match(req, { ignoreSearch: true })) ??
+        // Navigation requests fall back to the cached shell (SPA-style).
+        (req.mode === 'navigate' ? await cache.match('./', { ignoreSearch: true }) : undefined);
       const network = fetch(req)
         .then((res) => {
           if (res && res.ok && res.type === 'basic') {
-            cache.put(req, res.clone()).catch(() => undefined);
+            const key = new URL(req.url);
+            key.search = '';
+            cache.put(key.toString(), res.clone()).catch(() => undefined);
           }
           return res;
         })
