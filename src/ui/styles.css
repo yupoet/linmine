@@ -1894,3 +1894,36 @@
     font-size: 1.5rem;
   }
 }
+
+/* --- language switcher ------------------------------------------------------ */
+.settings__lang {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  margin-bottom: 0.75rem;
+}
+.langbtns {
+  display: flex;
+  gap: 0.4rem;
+}
+.langbtn {
+  font: inherit;
+  font-size: 0.9rem;
+  padding: 0.42rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: rgba(246, 236, 224, 0.75);
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+.langbtn.is-on {
+  background: linear-gradient(180deg, #ffd977, #f0a942);
+  border-color: #f0a942;
+  color: #40270c;
+  font-weight: 700;
+}

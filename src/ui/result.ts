@@ -18,6 +18,7 @@ import {
   text,
 } from './dom.ts';
 import { svg } from './icons.ts';
+import { t } from '../i18n/index.ts';
 
 const EMPTY_RESULT: ResultView = {
   won: false,
@@ -48,9 +49,9 @@ const EMPTY_RESULT: ResultView = {
 };
 
 function headline(view: ResultView): string {
-  if (view.won === true) return 'Shaft cleared!';
-  if (view.reason === 'stuck') return 'Boxed in!';
-  return 'Pickaxe worn out';
+  if (view.won === true) return t('Shaft cleared!');
+  if (view.reason === 'stuck') return t('Boxed in!');
+  return t('Pickaxe worn out');
 }
 
 export interface ResultScreen extends ScreenModule {
@@ -88,10 +89,10 @@ export function createResult(
     settlementList.appendChild(row);
   }
   const settlementList = h('div', 'rowlist');
-  addRow('Run cash', (v) => num(v.settlement?.runCash));
-  addRow('Win bonus', (v) => num(v.settlement?.winBonus));
-  addRow('Depth bonus', (v) => num(v.settlement?.depthBonus));
-  addRow('Total', (v) => num(v.settlement?.total), 'row--total');
+  addRow(t('Run cash'), (v) => num(v.settlement?.runCash));
+  addRow(t('Win bonus'), (v) => num(v.settlement?.winBonus));
+  addRow(t('Depth bonus'), (v) => num(v.settlement?.depthBonus));
+  addRow(t('Total'), (v) => num(v.settlement?.total), 'row--total');
 
   // --- highlights ---------------------------------------------------------
   const statCards: Array<{ value: HTMLSpanElement; pick: (v: ResultView) => number }> = [];
@@ -103,15 +104,15 @@ export function createResult(
     );
   }
   const statGrid = h('div', 'statgrid');
-  addStat('Blocks mined', (v) => num(v.stats?.blocksMined));
-  addStat('Chain blocks', (v) => num(v.stats?.chainBlocks));
-  addStat('Longest fall', (v) => num(v.stats?.longestFall));
-  addStat('Ore mined', (v) => num(v.stats?.oreMined));
+  addStat(t('Blocks mined'), (v) => num(v.stats?.blocksMined));
+  addStat(t('Chain blocks'), (v) => num(v.stats?.chainBlocks));
+  addStat(t('Longest fall'), (v) => num(v.stats?.longestFall));
+  addStat(t('Ore mined'), (v) => num(v.stats?.oreMined));
 
   // --- reward -------------------------------------------------------------
   const rewardName = h('span', 'reward__name');
   const rewardNote = h('span', 'reward__note');
-  const claim = h('button', 'btn btn--primary', ['Claim']);
+  const claim = h('button', 'btn btn--primary', [t('Claim')]);
   claim.type = 'button';
   claim.addEventListener('click', () => handlers.claimResult());
   const reward = h('div', 'reward', [
@@ -129,15 +130,15 @@ export function createResult(
     pendingText,
   ]);
 
-  const again = h('button', 'btn btn--ghost', ['Dig again']);
+  const again = h('button', 'btn btn--ghost', [t('Dig again')]);
   again.type = 'button';
   again.addEventListener('click', () => handlers.claimResult());
 
-  const shop = h('button', 'btn btn--ghost', [svg('chest', 'icon'), 'Shop']);
+  const shop = h('button', 'btn btn--ghost', [svg('chest', 'icon'), t('Shop')]);
   shop.type = 'button';
   shop.addEventListener('click', () => handlers.goToShop());
 
-  const levels = h('button', 'btn btn--ghost', ['Levels']);
+  const levels = h('button', 'btn btn--ghost', [t('Levels')]);
   levels.type = 'button';
   levels.addEventListener('click', () => handlers.goToLevels());
 
@@ -165,14 +166,14 @@ export function createResult(
       const target = Math.max(1, Math.round(num(v.targetDepth, 1)));
       const depth = Math.round(num(v.depth));
 
-      setText(stamp, won ? 'Cleared' : 'Run over');
+      setText(stamp, won ? t('Cleared') : t('Run over'));
       setText(headlineEl, headline(v));
-      setText(levelName, text(v.levelName, 'The mine'));
+      setText(levelName, text(v.levelName, t('The mine')));
       setFlag(el, 'is-win', won);
       setFlag(el, 'is-loss', !won);
 
       setText(depthValue, String(depth));
-      setText(depthGoal, `of ${target} m`);
+      setText(depthGoal, t('of {n} m', { n: target }));
       depthFill.style.width = `${Math.min(100, (depth / target) * 100).toFixed(1)}%`;
 
       const total = Math.round(num(v.settlement?.total));
@@ -181,7 +182,7 @@ export function createResult(
       const collected = Math.round(num(v.cashCollected));
       setText(
         payoutNote,
-        collected > 0 ? `Picked up ${fmtNum(collected)} in the shaft` : 'Nothing in the pockets',
+        collected > 0 ? t('Picked up {n} in the shaft', { n: fmtNum(collected) }) : t('Nothing in the pockets'),
       );
 
       for (const row of rows) {
@@ -191,24 +192,25 @@ export function createResult(
         setText(stat.value, fmtNum(stat.pick(v)));
       }
 
-      const tier: ChestTier | null = v.rewardTier === 'common' || v.rewardTier === 'rare'
-        ? v.rewardTier
-        : null;
+      const tier: ChestTier | null =
+        v.rewardTier === 'common' || v.rewardTier === 'rare' || v.rewardTier === 'epic'
+          ? v.rewardTier
+          : null;
       setFlag(reward, 'is-empty', tier === null);
-      setText(rewardName, tier ? CHESTS[tier].name : 'No crate this time');
-      setText(rewardNote, tier ? 'Open it for cards and cash' : 'Clear the shaft to earn one');
-      setText(claim, tier ? 'Claim' : 'Collect');
+      setText(rewardName, tier ? t(CHESTS[tier].name) : t('No crate this time'));
+      setText(rewardNote, tier ? t('Open it for cards and cash') : t('Clear the shaft to earn one'));
+      setText(claim, tier ? t('Claim') : t('Collect'));
 
       const pendingChests = list(v.pendingChests);
       setFlag(pending, 'is-hidden', pendingChests.length === 0);
       if (pendingChests.length > 0) {
-        const names = pendingChests.map((t) => (t === 'rare' ? CHESTS.rare.name : CHESTS.common.name));
-        setText(pendingText, `${names.join(' + ')} waiting in the shop`);
+        const names = pendingChests.map((chest) => t(CHESTS[chest].name));
+        setText(pendingText, t('{names} waiting in the shop', { names: names.join(' + ') }));
       }
 
       const unlocked = typeof v.unlockedLevelName === 'string' ? v.unlockedLevelName : '';
       setFlag(unlock, 'is-hidden', unlocked.length === 0);
-      if (unlocked.length > 0) setText(unlockText, `New dig unlocked — ${unlocked}`);
+      if (unlocked.length > 0) setText(unlockText, t('New dig unlocked — {name}', { name: unlocked }));
     },
 
     dispose(): void {

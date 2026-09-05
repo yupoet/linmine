@@ -21,6 +21,7 @@ import {
   text,
 } from './dom.ts';
 import { svg } from './icons.ts';
+import { t } from '../i18n/index.ts';
 
 const EMPTY_SHOP: ShopView = {
   cash: 0,
@@ -32,11 +33,12 @@ const EMPTY_SHOP: ShopView = {
   chests: {
     common: { name: CHESTS.common.name, cost: CHESTS.common.cost, cards: CHESTS.common.cards },
     rare: { name: CHESTS.rare.name, cost: CHESTS.rare.cost, cards: CHESTS.rare.cards },
+    epic: { name: CHESTS.epic.name, cost: CHESTS.epic.cost, cards: CHESTS.epic.cards },
   },
   pendingChests: [],
 };
 
-const TIERS: readonly ChestTier[] = ['common', 'rare'];
+const TIERS: readonly ChestTier[] = ['common', 'rare', 'epic'];
 
 export interface ShopScreen extends ScreenModule {
   render(view: ShopView): void;
@@ -57,7 +59,7 @@ export function createShop(
 
   const back = h('button', 'iconbtn', [svg('back', 'icon')]);
   back.type = 'button';
-  back.setAttribute('aria-label', 'Back to levels');
+  back.setAttribute('aria-label', t('Back to levels'));
   back.addEventListener('click', () => handlers.goToLevels());
 
   // --- pickaxe ------------------------------------------------------------
@@ -65,18 +67,18 @@ export function createShop(
   const pickBonus = h('span', 'upgrade__bonus');
   const pickCost = h('span', 'upgrade__cost');
   const pickReason = h('p', 'upgrade__reason');
-  const buyPick = h('button', 'btn btn--primary', ['Upgrade']);
+  const buyPick = h('button', 'btn btn--primary', [t('Upgrade')]);
   buyPick.type = 'button';
   buyPick.addEventListener('click', () => handlers.buyPickaxe());
 
   const pickaxeSection = h('section', 'shop__section', [
-    sectionTitle('Pickaxe'),
+    sectionTitle(t('Pickaxe')),
     h('div', 'upgrade', [
       h('div', 'upgrade__art', [svg('pickaxe', 'upgrade__icon')]),
       h('div', 'upgrade__info', [
-        h('div', 'upgrade__row', [h('span', 'upgrade__label', ['Durability']), pickLevel]),
+        h('div', 'upgrade__row', [h('span', 'upgrade__label', [t('Durability')]), pickLevel]),
         pickBonus,
-        h('div', 'upgrade__row', [h('span', 'upgrade__label', ['Cost']), pickCost]),
+        h('div', 'upgrade__row', [h('span', 'upgrade__label', [t('Cost')]), pickCost]),
         pickReason,
       ]),
       buyPick,
@@ -90,11 +92,11 @@ export function createShop(
     const name = h('span', 'crate__name');
     const note = h('span', 'crate__note');
     const cost = h('span', 'crate__cost');
-    const buy = h('button', 'btn btn--primary btn--sm', ['Buy']);
+    const buy = h('button', 'btn btn--primary btn--sm', [t('Buy')]);
     buy.type = 'button';
     buy.addEventListener('click', () => handlers.buyChest(tier));
     const root = h('div', `crate crate--${tier}`, [
-      h('span', 'crate__art', [svg('chest', 'crate__icon'), svg(tier === 'rare' ? 'gem' : 'bolt', 'crate__mark')]),
+      h('span', 'crate__art', [svg('chest', 'crate__icon'), svg(tier === 'common' ? 'bolt' : 'gem', 'crate__mark')]),
       h('span', 'crate__text', [name, note]),
       h('span', 'crate__buy', [cost, buy]),
     ]);
@@ -118,27 +120,27 @@ export function createShop(
     pendingButtons.set(tier, { root, label });
   }
   const pendingSection = h('section', 'shop__section', [
-    sectionTitle('Unopened crates'),
+    sectionTitle(t('Unopened crates')),
     pendingRow,
   ]);
 
   // --- collection ---------------------------------------------------------
   const collection = h('div', 'cardgrid cardgrid--collection');
   const collectionSection = h('section', 'shop__section', [
-    sectionTitle('Card collection'),
+    sectionTitle(t('Card collection')),
     collection,
   ]);
 
   el.appendChild(
     panel([
       panelHead([
-        h('div', 'panel__title', [back, h('h1', 'panel__heading', ['Shop'])]),
+        h('div', 'panel__title', [back, h('h1', 'panel__heading', [t('Shop')])]),
         h('div', 'stat stat--cash', [
           h('span', 'stat__icon', [svg('coin', 'icon')]),
           h('span', 'stat__value', [cashValue.el]),
         ]),
       ]),
-      panelBody([pickaxeSection, h('section', 'shop__section', [sectionTitle('Crates'), crateList]), pendingSection, collectionSection]),
+      panelBody([pickaxeSection, h('section', 'shop__section', [sectionTitle(t('Crates')), crateList]), pendingSection, collectionSection]),
       panelFoot([]),
     ]),
   );
@@ -177,16 +179,16 @@ export function createShop(
 
       cashValue.set(cash);
 
-      setText(pickLevel, maxed ? `Lvl ${maxLevel} — max` : `Lvl ${level} → ${level + 1}`);
+      setText(pickLevel, maxed ? t('Lvl {n} — max', { n: maxLevel }) : t('Lvl {a} → {b}', { a: level, b: level + 1 }));
       setText(
         pickBonus,
-        maxed ? 'Your pick cannot get any tougher.' : `+${Math.round(num(v.nextDurabilityBonus))} durability per run`,
+        maxed ? t('Your pick cannot get any tougher.') : t('+{n} durability per run', { n: Math.round(num(v.nextDurabilityBonus)) }),
       );
       setText(pickCost, maxed ? '—' : fmtNum(cost));
 
       buyPick.disabled = maxed || shortfall > 0;
       setFlag(pickaxeSection, 'is-maxed', maxed);
-      setText(pickReason, maxed ? '' : shortfall > 0 ? `Need ${fmtNum(shortfall)} more cash` : '');
+      setText(pickReason, maxed ? '' : shortfall > 0 ? t('Need {n} more cash', { n: fmtNum(shortfall) }) : '');
       setFlag(pickReason, 'is-hidden', maxed || shortfall === 0);
 
       for (const tier of TIERS) {
@@ -197,8 +199,8 @@ export function createShop(
         const cards = Math.max(1, Math.round(num(def?.cards, CHESTS[tier].cards)));
         const missing = Math.max(0, Math.ceil(price - cash));
 
-        setText(row.name, text(def?.name, CHESTS[tier].name));
-        setText(row.note, `${cards} ${cards === 1 ? 'card' : 'cards'} + cash`);
+        setText(row.name, text(def?.name, t(CHESTS[tier].name)));
+        setText(row.note, t(cards === 1 ? '{n} card + cash' : '{n} cards + cash', { n: cards }));
         setText(row.cost, fmtNum(price));
         row.buy.disabled = missing > 0;
         setFlag(row.root, 'is-broke', missing > 0);
@@ -207,7 +209,7 @@ export function createShop(
       const pending = list(v.pendingChests);
       const counts = new Map<ChestTier, number>();
       for (const tier of pending) {
-        if (tier !== 'common' && tier !== 'rare') continue;
+        if (tier !== 'common' && tier !== 'rare' && tier !== 'epic') continue;
         counts.set(tier, (counts.get(tier) ?? 0) + 1);
       }
       setFlag(pendingSection, 'is-hidden', counts.size === 0);
@@ -216,7 +218,7 @@ export function createShop(
         if (!entry) continue;
         const count = counts.get(tier) ?? 0;
         entry.root.classList.toggle('is-hidden', count === 0);
-        setText(entry.label, `Open ${CHESTS[tier].name}${count > 1 ? ` x${count}` : ''}`);
+        setText(entry.label, count > 1 ? t('Open {name} x{n}', { name: t(CHESTS[tier].name), n: count }) : t('Open {name}', { name: t(CHESTS[tier].name) }));
       }
 
       syncCards(list(v.cards));

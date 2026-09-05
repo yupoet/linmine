@@ -21,6 +21,7 @@ import type {
   UIHandlers,
 } from '../app/contracts.ts';
 import { h, setFlag, setText, text } from './dom.ts';
+import { t } from '../i18n/index.ts';
 import { createDraft } from './draft.ts';
 import { createHud } from './hud.ts';
 import { createLevels } from './levels.ts';
@@ -69,7 +70,7 @@ export function createUI(root: HTMLElement, handlers: UIHandlers): UIAPI {
   layer.appendChild(toasts);
 
   const tutText = h('p', 'tut__text');
-  const tutOk = h('button', 'btn btn--sm tut__ok', ['Got it']);
+  const tutOk = h('button', 'btn btn--sm tut__ok', [t('Got it')]);
   tutOk.type = 'button';
   tutOk.addEventListener('click', () => handlers.dismissTutorial());
   const tutorial = h('div', 'tut', [h('span', 'tut__tail'), tutText, tutOk]);
@@ -150,7 +151,7 @@ export function createUI(root: HTMLElement, handlers: UIHandlers): UIAPI {
       if (anchor && (TUTORIAL_ANCHORS as readonly string[]).includes(anchor)) {
         tutorial.classList.add(`tut--${anchor}`);
       }
-      setText(tutText, text(step.text, 'Tap the soil to dig.'));
+      setText(tutText, text(step.text, t('Tap the soil to dig.')));
       tutorial.classList.add('is-on');
     },
 

@@ -167,7 +167,7 @@ describe('app loop', () => {
     ui.goToLevels();
     ui.selectLevel(LEVELS[2].id);
     expect(recorder.screens.at(-1)).toBe('levels');
-    expect(recorder.toasts.join(' ')).toContain('Clear');
+    expect(recorder.toasts.join(' ')).toContain('先通关上一条矿道');
   });
 
   it('starts a fresh profile with a starter card', () => {
@@ -263,7 +263,7 @@ describe('app loop', () => {
     ui.goToShop();
     ui.buyPickaxe();
     expect(game.getProfile().pickaxeLevel).toBe(1);
-    expect(recorder.toasts).toContain('Not enough cash');
+    expect(recorder.toasts).toContain('金币不足');
   });
 
   it('opens a pending crate and grants a card', () => {

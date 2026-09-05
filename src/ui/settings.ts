@@ -1,4 +1,4 @@
-/** Settings: three sound/feel switches, a guarded reset, and version info. */
+/** Settings: language, three sound/feel switches, a guarded reset, and version info. */
 
 import type { SettingsView } from '../app/contracts.ts';
 import {
@@ -13,12 +13,14 @@ import {
   setText,
   text,
 } from './dom.ts';
+import { t, type Lang } from '../i18n/index.ts';
 import { svg } from './icons.ts';
 
 const EMPTY_SETTINGS: SettingsView = {
   muted: false,
   reducedMotion: false,
   haptics: false,
+  lang: 'zh',
   schemaVersion: 0,
   configVersion: '',
 };
@@ -39,6 +41,7 @@ export function createSettings(handlers: {
   setMuted(muted: boolean): void;
   setReducedMotion(value: boolean): void;
   setHaptics(value: boolean): void;
+  setLang(lang: Lang): void;
   resetSave(): void;
   goToTitle(): void;
 }): SettingsScreen {
@@ -69,13 +72,27 @@ export function createSettings(handlers: {
     };
   }
 
-  const sound = createToggle('Sound', 'Mines are quiet by default.', (v) => handlers.setMuted(!v));
-  const motion = createToggle('Calm motion', 'Cuts screen shake and fades.', (v) =>
+  const sound = createToggle(t('Sound'), t('Mines are quiet by default.'), (v) => handlers.setMuted(!v));
+  const motion = createToggle(t('Calm motion'), t('Cuts screen shake and fades.'), (v) =>
     handlers.setReducedMotion(v),
   );
-  const haptics = createToggle('Haptics', 'Buzz on big chains.', (v) => handlers.setHaptics(v));
+  const haptics = createToggle(t('Haptics'), t('Buzz on big chains.'), (v) => handlers.setHaptics(v));
 
-  const reset = h('button', 'btn btn--danger', ['Reset save']);
+  // --- language -------------------------------------------------------------
+  // Two segmented buttons; the active one is highlighted. Choosing a language
+  // rebuilds the whole UI (the app owns that), so this screen is disposable.
+  const zhBtn = h('button', 'langbtn', ['中文']);
+  const enBtn = h('button', 'langbtn', ['English']);
+  zhBtn.type = 'button';
+  enBtn.type = 'button';
+  zhBtn.addEventListener('click', () => handlers.setLang('zh'));
+  enBtn.addEventListener('click', () => handlers.setLang('en'));
+  const langRow = h('div', 'settings__lang', [
+    h('span', 'switch__label', [t('Language')]),
+    h('div', 'langbtns', [zhBtn, enBtn]),
+  ]);
+
+  const reset = h('button', 'btn btn--danger', [t('Reset save')]);
   reset.type = 'button';
   let resetArmed = false;
   let resetTimer = 0;
@@ -87,7 +104,7 @@ export function createSettings(handlers: {
       resetTimer = 0;
     }
     reset.classList.remove('is-armed');
-    setText(reset, 'Reset save');
+    setText(reset, t('Reset save'));
   }
 
   reset.addEventListener('click', () => {
@@ -98,7 +115,7 @@ export function createSettings(handlers: {
     }
     resetArmed = true;
     reset.classList.add('is-armed');
-    setText(reset, 'Tap again to erase');
+    setText(reset, t('Tap again to erase'));
     resetTimer = window.setTimeout(disarmReset, RESET_CONFIRM_MS);
   });
 
@@ -106,16 +123,17 @@ export function createSettings(handlers: {
 
   const back = h('button', 'iconbtn', [svg('back', 'icon')]);
   back.type = 'button';
-  back.setAttribute('aria-label', 'Back to title');
+  back.setAttribute('aria-label', t('Back to title'));
   back.addEventListener('click', () => handlers.goToTitle());
 
   el.appendChild(
     panel([
-      panelHead([h('div', 'panel__title', [back, h('h1', 'panel__heading', ['Settings'])])]),
+      panelHead([h('div', 'panel__title', [back, h('h1', 'panel__heading', [t('Settings')])])]),
       panelBody([
+        langRow,
         h('div', 'settings__group', [sound.root, motion.root, haptics.root]),
         h('div', 'settings__group settings__group--danger', [
-          h('p', 'settings__note', ['Erasing your save removes cash, cards and level progress.']),
+          h('p', 'settings__note', [t('Erasing your save removes cash, cards and level progress.')]),
           reset,
         ]),
         version,
@@ -138,9 +156,12 @@ export function createSettings(handlers: {
       for (const entry of toggles) {
         entry.toggle.sync(entry.pick(v) === true);
       }
+      const lang: Lang = v.lang === 'en' ? 'en' : 'zh';
+      zhBtn.classList.toggle('is-on', lang === 'zh');
+      enBtn.classList.toggle('is-on', lang === 'en');
       setText(
         version,
-        `Save v${Math.round(num(v.schemaVersion))} · Config ${text(v.configVersion, 'unknown')}`,
+        t('Save v{n} · Config {v}', { n: Math.round(num(v.schemaVersion)), v: text(v.configVersion, 'unknown') }),
       );
     },
 

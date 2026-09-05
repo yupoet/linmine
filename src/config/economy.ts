@@ -18,7 +18,7 @@ export function pickaxeDurabilityBonus(level: number): number {
   return PICKAXE_DURABILITY_PER_LEVEL * (clamped - 1);
 }
 
-export type ChestTier = 'common' | 'rare';
+export type ChestTier = 'common' | 'rare' | 'epic';
 
 export interface ChestDef {
   id: ChestTier;
@@ -46,11 +46,42 @@ export const CHESTS: Record<ChestTier, ChestDef> = {
     cashMin: 520,
     cashMax: 940,
   },
+  epic: {
+    id: 'epic',
+    name: 'Royal Cache',
+    cost: 5000,
+    cards: 3,
+    cashMin: 1400,
+    cashMax: 2400,
+  },
 };
 
 /** Chest granted when a level is cleared. First clear pays the good one. */
 export function clearRewardTier(firstClear: boolean): ChestTier {
   return firstClear ? 'rare' : 'common';
+}
+
+/** Higher tier reward for a flawless run (win with >50% durability left). */
+export function flawlessRewardTier(firstClear: boolean): ChestTier {
+  return firstClear ? 'epic' : 'rare';
+}
+
+/**
+ * Deterministic daily seed from a UTC date so every player sees the same level
+ * change simultaneously worldwide (midnight UTC). Returns the seed and the
+ * date key (e.g. "20260905") for storage.
+ */
+export function dailySeedFor(date: Date = new Date()): { seed: number; key: string } {
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(date.getUTCDate()).padStart(2, '0');
+  const key = `${y}${m}${d}`;
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < key.length; i++) {
+    hash ^= key.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return { seed: hash, key };
 }
 
 export interface SettlementInput {

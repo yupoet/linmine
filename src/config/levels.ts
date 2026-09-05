@@ -168,8 +168,9 @@ export const LEVELS: readonly LevelDef[] = [
 
 export function levelById(id: string): LevelDef {
   const found = LEVELS.find((level) => level.id === id);
-  if (!found) throw new Error(`unknown level: ${id}`);
-  return found;
+  if (found) return found;
+  if (id.startsWith('daily_')) return dailyLevel(id);
+  throw new Error(`unknown level: ${id}`);
 }
 
 export function levelByIndex(index: number): LevelDef {
@@ -184,4 +185,49 @@ export function bandForRow(level: LevelDef, row: number): Record<WeightKey, numb
     if (row >= candidate.fromRow) band = candidate;
   }
   return band.weights;
+}
+
+const DAILY_PREFIX = 'daily_';
+
+/** Today's daily challenge. Public so the UI can show the level card
+ *  on the level select screen without re-deriving. */
+export function dailyLevel(id: string = `daily_${currentDailyKey()}`): LevelDef {
+  const key = id.slice(DAILY_PREFIX.length);
+  const { seed } = dailyKeyToSeed(key);
+  return {
+    id,
+    index: 0,
+    name: 'Daily Shaft',
+    blurb: `A new shaft every day at midnight UTC. Beat it for a bonus cache.`,
+    gridWidth: DEFAULT_GRID_WIDTH,
+    targetDepth: 90,
+    baseDurability: 80,
+    seedSalt: seed,
+    cashMultiplier: 1.6,
+    oreMultiplier: 1.4,
+    caveChance: 0.05,
+    winBonus: 400,
+    bands: DEFAULT_BANDS,
+  };
+}
+
+export function currentDailyKey(): string {
+  const d = new Date();
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}${m}${day}`;
+}
+
+export function isDailyId(id: string): boolean {
+  return id.startsWith(DAILY_PREFIX);
+}
+
+function dailyKeyToSeed(key: string): { seed: number } {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < key.length; i++) {
+    hash ^= key.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return { seed: hash };
 }

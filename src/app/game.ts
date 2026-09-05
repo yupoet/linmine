@@ -58,9 +58,12 @@ import type { AnalyticsAPI } from './analytics.ts';
 import type { AudioAPI } from '../platform/audio.ts';
 import type { StorageAPI } from '../platform/storage.ts';
 import type { Cell, DigResult, RunState } from '../core/types.ts';
+import { gameName, setLang as setI18nLang, t, tCardDesc, tChest, type Lang } from '../i18n/index.ts';
 
 export interface GameDeps {
   ui: UIAPI;
+  /** Rebuilds the UI (language switch rebuilds static chrome). Optional. */
+  rebuildUI?: () => UIAPI;
   renderer: RendererAPI;
   audio: AudioAPI;
   storage: StorageAPI;
@@ -86,7 +89,8 @@ export interface GameAPI {
 }
 
 export function createGame(deps: GameDeps): GameAPI {
-  const { ui, renderer, audio, storage, analytics } = deps;
+  const { renderer, audio, storage, analytics } = deps;
+  let ui = deps.ui;
   const now = deps.now ?? (() => Date.now());
   const haptics = deps.haptics ?? (() => undefined);
 
@@ -122,11 +126,11 @@ export function createGame(deps: GameDeps): GameAPI {
       const level = ownedEntry?.level ?? 0;
       return {
         id: card.id,
-        name: card.name,
+        name: t(card.name),
         family: card.family,
         level,
         maxLevel: card.maxLevel,
-        description: card.describe(Math.max(1, level)),
+        description: tCardDesc(card, Math.max(1, level)),
         owned: owned.some((entry) => entry.id === card.id),
         selected: selected.includes(card.id),
       };
@@ -138,8 +142,8 @@ export function createGame(deps: GameDeps): GameAPI {
       const record = profile.levels[level.id];
       return {
         id: level.id,
-        name: level.name,
-        blurb: level.blurb,
+        name: t(level.name),
+        blurb: t(level.blurb),
         targetDepth: level.targetDepth,
         unlocked: isLevelUnlocked(profile, level.index),
         cleared: (record?.clears ?? 0) > 0,
@@ -170,7 +174,7 @@ export function createGame(deps: GameDeps): GameAPI {
       depth: run.depth,
       targetDepth: run.level.targetDepth,
       chains: run.stats.chainsTriggered,
-      levelName: run.level.name,
+      levelName: t(run.level.name),
       banner,
     };
   }
@@ -259,8 +263,9 @@ export function createGame(deps: GameDeps): GameAPI {
       nextDurabilityBonus: 3,
       cards: cardViews([]),
       chests: {
-        common: { name: CHESTS.common.name, cost: CHESTS.common.cost, cards: CHESTS.common.cards },
-        rare: { name: CHESTS.rare.name, cost: CHESTS.rare.cost, cards: CHESTS.rare.cards },
+        common: { name: tChest(CHESTS.common.name), cost: CHESTS.common.cost, cards: CHESTS.common.cards },
+        rare: { name: tChest(CHESTS.rare.name), cost: CHESTS.rare.cost, cards: CHESTS.rare.cards },
+        epic: { name: tChest(CHESTS.epic.name), cost: CHESTS.epic.cost, cards: CHESTS.epic.cards },
       },
       pendingChests: [...profile.pendingChests],
     };
@@ -273,6 +278,7 @@ export function createGame(deps: GameDeps): GameAPI {
       muted: profile.settings.muted,
       reducedMotion: profile.settings.reducedMotion,
       haptics: profile.settings.haptics,
+      lang: profile.settings.lang,
       schemaVersion: profile.schemaVersion,
       configVersion: CONFIG_VERSION,
     };
@@ -315,7 +321,7 @@ export function createGame(deps: GameDeps): GameAPI {
     if (!profile.tutorialDone) {
       setTutorial({
         id: 'tap-to-dig',
-        text: 'Tap a glowing block to dig. The miner walks there and swings.',
+        text: t('Tap a glowing block to dig. The miner walks there and swings.'),
         anchor: 'grid',
       });
     }
@@ -387,13 +393,13 @@ export function createGame(deps: GameDeps): GameAPI {
     if (!result.ok) {
       switch (result.reason) {
         case 'indestructible':
-          hint('Bedrock — the pick cannot bite');
+          hint(t('Bedrock — the pick cannot bite'));
           break;
         case 'unreachable':
-          hint('The miner cannot reach that yet');
+          hint(t('The miner cannot reach that yet'));
           break;
         case 'no_durability':
-          hint('No durability left');
+          hint(t('No durability left'));
           break;
         default:
           break;
@@ -428,7 +434,7 @@ export function createGame(deps: GameDeps): GameAPI {
 
     const cleared = result.removed.length;
     if (cleared >= 6) {
-      banner = `CHAIN x${cleared}!`;
+      banner = t('CHAIN x{n}!', { n: cleared });
       bannerTimer = 1.4;
     }
 
@@ -440,13 +446,13 @@ export function createGame(deps: GameDeps): GameAPI {
       if (tutorial?.id === 'tap-to-dig') {
         setTutorial({
           id: 'fall-and-chain',
-          text: 'Blast crates chain for free, and long drops cost nothing. Use them.',
+          text: t('Blast crates chain for free, and long drops cost nothing. Use them.'),
           anchor: 'hud',
         });
       } else if (tutorial?.id === 'fall-and-chain' && run.durability < run.maxDurability * 0.35) {
         setTutorial({
           id: 'repair',
-          text: 'Running low? Green supply crates restore durability.',
+          text: t('Running low? Green supply crates restore durability.'),
           anchor: 'hud',
         });
       } else if (tutorial?.id === 'repair') {
@@ -503,7 +509,7 @@ export function createGame(deps: GameDeps): GameAPI {
     return {
       won,
       reason: state.endReason ?? 'durability',
-      levelName: state.level.name,
+      levelName: t(state.level.name),
       depth: state.depth,
       targetDepth: state.level.targetDepth,
       cashCollected: state.cash,
@@ -525,7 +531,7 @@ export function createGame(deps: GameDeps): GameAPI {
     if (!profile.tutorialDone) {
       setTutorial({
         id: 'result',
-        text: 'Cash buys pickaxe upgrades and crates. Crates hold cards.',
+        text: t('Cash buys pickaxe upgrades and crates. Crates hold cards.'),
         anchor: 'result',
       });
     }
@@ -544,7 +550,7 @@ export function createGame(deps: GameDeps): GameAPI {
     if (!match) {
       const kind = run.grid.kindAt(cell.col, cell.row);
       if (kind === BlockKind.Empty) return;
-      hint(kind === BlockKind.Bedrock ? 'Bedrock — the pick cannot bite' : 'The miner cannot reach that yet');
+      hint(kind === BlockKind.Bedrock ? t('Bedrock — the pick cannot bite') : t('The miner cannot reach that yet'));
       return;
     }
 
@@ -574,7 +580,7 @@ export function createGame(deps: GameDeps): GameAPI {
     selectLevel(levelId: string): void {
       audio.play('ui');
       if (!isLevelUnlocked(profile, levelById(levelId).index)) {
-        ui.toast('Clear the previous dig first');
+        ui.toast(t('Clear the previous dig first'));
         return;
       }
       goToDraft(levelId);
@@ -583,7 +589,7 @@ export function createGame(deps: GameDeps): GameAPI {
       audio.play('ui');
       const owned = (profile.cards[cardId]?.count ?? 0) > 0;
       if (!owned) {
-        ui.toast('Find this card in a crate');
+        ui.toast(t('Find this card in a crate'));
         return;
       }
       const index = selectedCardIds.indexOf(cardId);
@@ -592,7 +598,7 @@ export function createGame(deps: GameDeps): GameAPI {
       } else if (selectedCardIds.length < MAX_CARDS_PER_RUN) {
         selectedCardIds.push(cardId);
       } else {
-        ui.toast(`Only ${MAX_CARDS_PER_RUN} cards per dig`);
+        ui.toast(t('Only {n} cards per dig', { n: MAX_CARDS_PER_RUN }));
         return;
       }
       renderDraft();
@@ -624,11 +630,11 @@ export function createGame(deps: GameDeps): GameAPI {
     },
     buyPickaxe(): void {
       if (profile.pickaxeLevel >= PICKAXE_MAX_LEVEL) {
-        ui.toast('Pickaxe is maxed');
+        ui.toast(t('Pickaxe is maxed'));
         return;
       }
       if (!buyPickaxe(profile)) {
-        ui.toast('Not enough cash');
+        ui.toast(t('Not enough cash'));
         audio.play('error');
         return;
       }
@@ -639,7 +645,7 @@ export function createGame(deps: GameDeps): GameAPI {
     },
     buyChest(tier: ChestTier): void {
       if (!buyChest(profile, tier)) {
-        ui.toast('Not enough cash');
+        ui.toast(t('Not enough cash'));
         audio.play('error');
         return;
       }
@@ -650,7 +656,7 @@ export function createGame(deps: GameDeps): GameAPI {
     },
     openPendingChest(tier: ChestTier): void {
       if (!takePendingChest(profile, tier)) {
-        ui.toast('No crate to open');
+        ui.toast(t('No crate to open'));
         return;
       }
       const reward = openChest(profile, tier, createRng((now() ^ profile.stats.chestsOpened) >>> 0));
@@ -686,13 +692,26 @@ export function createGame(deps: GameDeps): GameAPI {
       save();
       goToSettings();
     },
+    setLang(lang: Lang): void {
+      profile.settings.lang = lang;
+      setI18nLang(lang);
+      if (typeof document !== 'undefined') document.title = gameName();
+      save();
+      // Static chrome (headings, buttons) is built once per UI instance, so a
+      // language switch rebuilds the whole UI and re-renders the open screen.
+      if (deps.rebuildUI) {
+        ui.dispose();
+        ui = deps.rebuildUI();
+      }
+      refreshScreen();
+    },
     resetSave(): void {
       storage.clear();
       profile = createProfile();
       save();
       audio.setMuted(profile.settings.muted);
       renderer.setReducedMotion(profile.settings.reducedMotion);
-      ui.toast('Save reset');
+      ui.toast(t('Save reset'));
       goTo('title');
     },
     dismissTutorial(): void {
@@ -702,11 +721,49 @@ export function createGame(deps: GameDeps): GameAPI {
     },
   };
 
+  /** Re-render whichever screen is open (after a UI rebuild). */
+  function refreshScreen(): void {
+    switch (screen) {
+      case 'title':
+        goTo('title');
+        break;
+      case 'levels':
+        goToLevels();
+        break;
+      case 'draft':
+        if (draftLevelId) goToDraft(draftLevelId);
+        break;
+      case 'run':
+        if (run) {
+          renderer.setState(run);
+          pushTargets();
+          pushHud();
+        }
+        goTo('run');
+        break;
+      case 'result':
+        if (pendingResult) {
+          ui.renderResult(pendingResult);
+          goTo('result');
+        }
+        break;
+      case 'shop':
+        goToShop();
+        break;
+      case 'settings':
+        goToSettings();
+        break;
+    }
+  }
+
   function announceReward(reward: ChestReward): void {
     const names = reward.cards
-      .map((card) => (card.duplicates ? `${card.name} (max)` : `${card.name} L${card.level}`))
+      .map((card) => {
+        const name = t(card.name);
+        return card.duplicates ? `${name}（${t('max')}）` : `${name} L${card.level}`;
+      })
       .join(', ');
-    ui.toast(`+${reward.cash} cash${names ? ` · ${names}` : ''}`);
+    ui.toast(t('+{n} cash', { n: reward.cash }) + (names ? ` · ${names}` : ''));
   }
 
   // ------------------------------------------------------------------- frame
@@ -742,9 +799,9 @@ export function createGame(deps: GameDeps): GameAPI {
     const loaded = storage.load();
     profile = loaded.profile;
 
-    if (loaded.status === 'recovered') ui.toast('Save restored from backup');
-    if (loaded.status === 'corrupt') ui.toast('Save could not be read — starting fresh');
-    if (!storage.persistent) ui.toast('Storage unavailable: progress is session-only');
+    if (loaded.status === 'recovered') ui.toast(t('Save restored from backup'));
+    if (loaded.status === 'corrupt') ui.toast(t('Save could not be read — starting fresh'));
+    if (!storage.persistent) ui.toast(t('Storage unavailable: progress is session-only'));
 
     if (profile.stats.runs === 0 && Object.keys(profile.cards).length === 0) {
       grantStarterCard(profile, createRng(now() >>> 0));
@@ -753,6 +810,8 @@ export function createGame(deps: GameDeps): GameAPI {
 
     audio.setMuted(profile.settings.muted);
     renderer.setReducedMotion(profile.settings.reducedMotion);
+    setI18nLang(profile.settings.lang);
+    if (typeof document !== 'undefined') document.title = gameName();
     goTo('title');
   }
 

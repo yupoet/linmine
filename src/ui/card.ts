@@ -2,6 +2,7 @@
 
 import type { CardView } from '../app/contracts.ts';
 import { h, num, setFlag, setText, text } from './dom.ts';
+import { t } from '../i18n/index.ts';
 import { svg } from './icons.ts';
 
 const FAMILY_LABEL: Record<string, string> = {
@@ -40,7 +41,7 @@ export function createCardTile(options: CardTileOptions = {}): CardTile {
   const family = h('span', 'card__family');
   const desc = h('span', 'card__desc');
   const pips = h('span', 'card__pips');
-  const lockNote = h('span', 'card__lock', [svg('lock', 'icon'), 'Find it in a crate']);
+  const lockNote = h('span', 'card__lock', [svg('lock', 'icon'), t('Find it in a crate')]);
 
   const el = h(interactive ? 'button' : 'div', interactive ? 'card card--tap' : 'card', [
     h('span', 'card__head', [name, badge]),
@@ -80,10 +81,10 @@ export function createCardTile(options: CardTileOptions = {}): CardTile {
       const maxLevel = Math.max(1, Math.round(num(c.maxLevel, 1)));
       const owned = c.owned !== false;
 
-      setText(name, text(c.name, 'Unknown card'));
-      setText(family, FAMILY_LABEL[text(c.family)] ?? text(c.family, 'Card'));
-      setText(desc, text(c.description, 'No effect yet.'));
-      setText(badge, owned && level > 0 ? `L${level}/${maxLevel}` : 'Locked');
+      setText(name, text(c.name, t('Unknown card')));
+      setText(family, t(FAMILY_LABEL[text(c.family)] ?? text(c.family, 'Card')));
+      setText(desc, text(c.description, t('No effect yet.')));
+      setText(badge, owned && level > 0 ? t('L{n}/{max}', { n: level, max: maxLevel }) : t('Locked'));
 
       if (pipCount !== maxLevel) buildPips(maxLevel, level);
       else {

@@ -55,8 +55,13 @@ function main(): void {
 
   const ui = createUI(uiRoot, lateBound);
 
+  // Language switching rebuilds the whole UI (static chrome is constructed
+  // once per instance), so the game gets a factory to swap it out.
+  const rebuildUI = () => createUI(uiRoot, lateBound);
+
   game = createGame({
     ui,
+    rebuildUI,
     renderer,
     audio,
     storage,

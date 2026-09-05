@@ -17,6 +17,7 @@ import {
   text,
 } from './dom.ts';
 import { svg } from './icons.ts';
+import { t } from '../i18n/index.ts';
 
 interface LevelRow {
   root: HTMLButtonElement;
@@ -53,10 +54,10 @@ export function createLevels(
 
   const back = h('button', 'iconbtn', [svg('back', 'icon')]);
   back.type = 'button';
-  back.setAttribute('aria-label', 'Back to title');
+  back.setAttribute('aria-label', t('Back to title'));
   back.addEventListener('click', () => handlers.goToTitle());
 
-  const shop = h('button', 'btn btn--ghost', [svg('chest', 'icon'), 'Shop']);
+  const shop = h('button', 'btn btn--ghost', [svg('chest', 'icon'), t('Shop')]);
   shop.type = 'button';
   shop.addEventListener('click', () => handlers.goToShop());
 
@@ -65,7 +66,7 @@ export function createLevels(
   el.appendChild(
     panel([
       panelHead([
-        h('div', 'panel__title', [back, h('h1', 'panel__heading', ['Pick a dig'])]),
+        h('div', 'panel__title', [back, h('h1', 'panel__heading', [t('Pick a dig')])]),
         h('div', 'panel__stats', [cashChip, pickChip]),
       ]),
       panelBody([listEl]),
@@ -86,7 +87,7 @@ export function createLevels(
     const plays = h('span', 'tag tag--plays');
     const lock = h('div', 'levelcard__lock', [
       h('span', 'levelcard__lock-icon', [svg('lock', 'icon')]),
-      h('span', 'levelcard__lock-text', ['Clear the previous dig']),
+      h('span', 'levelcard__lock-text', [t('Clear the previous dig')]),
     ]);
 
     const root = h('button', 'levelcard', [
@@ -130,18 +131,18 @@ export function createLevels(
         const row = rows.get(level.id);
         if (!row) return;
         setText(row.index, String(i + 1).padStart(2, '0'));
-        setText(row.name, text(level.name, 'Unknown dig'));
+        setText(row.name, text(level.name, t('Unknown dig')));
         setText(row.blurb, text(level.blurb));
-        setText(row.goal, `Reach ${Math.round(num(level.targetDepth))} m`);
+        setText(row.goal, t('Reach {n} m', { n: Math.round(num(level.targetDepth)) }));
 
         const best = Math.round(num(level.bestDepth));
-        setText(row.best, best > 0 ? `Best ${best} m` : 'No dig yet');
+        setText(row.best, best > 0 ? t('Best {n} m', { n: best }) : t('No dig yet'));
 
         const plays = Math.max(0, Math.round(num(level.plays)));
         const clears = Math.max(0, Math.round(num(level.clears)));
         setText(
           row.plays,
-          `${plays} ${plays === 1 ? 'play' : 'plays'} · ${clears} ${clears === 1 ? 'clear' : 'clears'}`,
+          t('{p} play · {c} clear', { p: plays, c: clears }),
         );
 
         const unlocked = level.unlocked !== false;
@@ -151,7 +152,7 @@ export function createLevels(
       });
 
       cashValue.set(num(cash));
-      setText(pickValue, `Lvl ${Math.max(1, Math.round(num(pickaxeLevel, 1)))}`);
+      setText(pickValue, `${t('Lvl')} ${Math.max(1, Math.round(num(pickaxeLevel, 1)))}`);
     },
 
     dispose(): void {

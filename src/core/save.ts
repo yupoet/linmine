@@ -28,6 +28,8 @@ export interface ProfileSettings {
   muted: boolean;
   reducedMotion: boolean;
   haptics: boolean;
+  /** UI language. Chinese is the default; English is opt-in. */
+  lang: 'zh' | 'en';
 }
 
 export interface LifetimeStats {
@@ -63,7 +65,7 @@ export function createProfile(): Profile {
     cards: {},
     levels: Object.fromEntries(LEVELS.map((level) => [level.id, emptyLevelRecord()])),
     pendingChests: [],
-    settings: { muted: false, reducedMotion: false, haptics: true },
+    settings: { muted: false, reducedMotion: false, haptics: true, lang: 'zh' },
     tutorialDone: false,
     stats: { runs: 0, wins: 0, deepestRow: 0, blocksMined: 0, chestsOpened: 0 },
     updatedAt: 0,
@@ -125,7 +127,7 @@ export function sanitizeProfile(raw: unknown): Profile {
 
   if (Array.isArray(raw.pendingChests)) {
     profile.pendingChests = raw.pendingChests.filter(
-      (tier): tier is ChestTier => tier === 'common' || tier === 'rare',
+      (tier): tier is ChestTier => tier === 'common' || tier === 'rare' || tier === 'epic',
     );
   }
 
@@ -134,6 +136,7 @@ export function sanitizeProfile(raw: unknown): Profile {
       muted: bool(raw.settings.muted, false),
       reducedMotion: bool(raw.settings.reducedMotion, false),
       haptics: bool(raw.settings.haptics, true),
+      lang: raw.settings.lang === 'en' ? 'en' : 'zh',
     };
   }
 

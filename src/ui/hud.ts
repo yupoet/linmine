@@ -9,6 +9,7 @@
 import type { HudView } from '../app/contracts.ts';
 import { Counter, clamp01, createScreenEl, h, num, setFlag, setText, text } from './dom.ts';
 import { svg } from './icons.ts';
+import { t } from '../i18n/index.ts';
 
 const EMPTY_HUD: HudView = {
   durability: 0,
@@ -82,7 +83,7 @@ export function createHud(
   const hint = h('div', 'hud__hint');
   const pause = h('button', 'iconbtn hud__pause', [svg('pause', 'icon')]);
   pause.type = 'button';
-  pause.setAttribute('aria-label', 'Pause dig');
+  pause.setAttribute('aria-label', t('Pause dig'));
   pause.addEventListener('click', () => handlers.quitRun());
 
   const topRow = h('div', 'hud__row hud__row--top', [
@@ -128,7 +129,7 @@ export function createHud(
       cashNow.set(num(v.cash));
 
       depthNow.set(depth);
-      setText(depthGoal, `of ${Math.round(target)} m`);
+      setText(depthGoal, t('of {n} m', { n: Math.round(target) }));
       const depthWidth = `${(clamp01(depth / target) * 100).toFixed(1)}%`;
       if (depthFill.style.height !== depthWidth) depthFill.style.height = depthWidth;
 

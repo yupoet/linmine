@@ -89,6 +89,7 @@ export interface SettingsView {
   muted: boolean;
   reducedMotion: boolean;
   haptics: boolean;
+  lang: 'zh' | 'en';
   schemaVersion: number;
   configVersion: string;
 }
@@ -117,6 +118,7 @@ export interface UIHandlers {
   setMuted(muted: boolean): void;
   setReducedMotion(value: boolean): void;
   setHaptics(value: boolean): void;
+  setLang(lang: 'zh' | 'en'): void;
   resetSave(): void;
   dismissTutorial(): void;
 }

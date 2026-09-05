@@ -17,6 +17,7 @@ import {
   text,
 } from './dom.ts';
 import { svg } from './icons.ts';
+import { t } from '../i18n/index.ts';
 
 const EMPTY_DRAFT: DraftView = {
   levelId: '',
@@ -44,25 +45,25 @@ export function createDraft(
   const target = h('span', 'draft__stat-value');
   const grid = h('div', 'cardgrid');
 
-  const start = h('button', 'btn btn--primary btn--xl', ['Start Dig']);
+  const start = h('button', 'btn btn--primary btn--xl', [t('Start Dig')]);
   start.type = 'button';
   start.addEventListener('click', () => handlers.beginRun());
 
   const back = h('button', 'iconbtn', [svg('back', 'icon')]);
   back.type = 'button';
-  back.setAttribute('aria-label', 'Back to levels');
+  back.setAttribute('aria-label', t('Back to levels'));
   back.addEventListener('click', () => handlers.goToLevels());
 
   el.appendChild(
     panel([
       panelHead([
         h('div', 'panel__title', [back, levelName]),
-        h('p', 'panel__sub', ['Equip up to ', maxCardsText, ' cards']),
+        h('p', 'panel__sub', [`${t('Equip up to')} `, maxCardsText, ` ${t('cards')}`]),
       ]),
       panelBody([
         h('div', 'draft__stats', [
-          h('div', 'draft__stat', [h('span', 'draft__stat-label', ['Pickaxe']), durability]),
-          h('div', 'draft__stat', [h('span', 'draft__stat-label', ['Target']), target]),
+          h('div', 'draft__stat', [h('span', 'draft__stat-label', [t('Pickaxe')]), durability]),
+          h('div', 'draft__stat', [h('span', 'draft__stat-label', [t('Target')]), target]),
         ]),
         grid,
       ]),
@@ -99,12 +100,12 @@ export function createDraft(
       const maxCards = Math.max(1, Math.round(num(v.maxCards, 3)));
       const count = Math.min(list(v.selectedIds).length, maxCards);
 
-      setText(levelName, text(v.levelName, 'Pick a dig'));
+      setText(levelName, text(v.levelName, t('Pick a dig')));
       setText(maxCardsText, String(maxCards));
-      setText(durability, `${Math.round(num(v.durability))} swings`);
-      setText(target, `${Math.round(num(v.targetDepth))} m`);
-      setText(picked, `${count} of ${maxCards} equipped`);
-      setText(start, count > 0 ? 'Start Dig' : 'Go bare-handed');
+      setText(durability, t('{n} swings', { n: Math.round(num(v.durability)) }));
+      setText(target, t('{n} m', { n: Math.round(num(v.targetDepth)) }));
+      setText(picked, t('{n} of {max} equipped', { n: count, max: maxCards }));
+      setText(start, count > 0 ? t('Start Dig') : t('Go bare-handed'));
       setFlag(start, 'is-quiet', count === 0);
 
       syncCards(cards, (id: string) => handlers.toggleCard(id));
